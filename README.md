@@ -39,7 +39,10 @@ results = run_all;
 
 In the MATLAB desktop this asks for your goal X/Y in world metres, computes a
 fresh path, and opens the original robot/world in 3D with wheel animation.
-The view shows the commanded path, executed trace and requested goal. It is a
+The view shows the commanded path, executed trace, a footprint outline that
+follows the robot, and the requested goal. Walls are drawn 0.6 m tall in this
+3D view only (real 2.2 m walls hid the robot); planning and collision checks
+still use the full walls. It is a
 replay of the freshly computed trajectory. Batch runs stay hidden.
 
 To set a goal directly without a dialog:

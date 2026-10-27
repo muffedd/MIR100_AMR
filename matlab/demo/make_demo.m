@@ -330,11 +330,15 @@ if isobject(plat) && isprop(plat, 'InitialBasePosition')
         return;
     end
 end
-baseZ = 0; source = 'URDF-derived (home-config lowest frame minus wheel radius)';
+baseZ = 0; source = 'URDF-derived (drive-wheel axle height minus wheel radius)';
 try
+    % Only the drive-wheel axles sit one wheel radius above the floor;
+    % base_link and sensor frames would wrongly lift the robot.
     cfg = homeConfiguration(robot);
     minZ = inf;
     for i = 1:numel(robot.Bodies)
+        nm = lower(robot.Bodies{i}.Name);
+        if ~contains(nm, 'wheel') || contains(nm, 'caster'), continue; end
         Tb = getTransform(robot, cfg, robot.Bodies{i}.Name);
         minZ = min(minZ, Tb(3,4));
     end
@@ -402,6 +406,8 @@ d = struct( ...
     'goalRadius',     0.05, ...
     'maxSimTime',     120, ...
     'wheelRadius',    0.0625, ... % xacro-verified; baseZ derivation only
+    'wallDisplayHeight', 0.6, ... % 3D view only: real 2.2 m walls hide the 0.35 m robot
+    'view3D',         [-30 55], ...
     'footprintRadius', 0.6052, ...
     'footprintVersion', 'v2 caster-full-coverage (project, 2026-10-27); radius 0.6052', ...
     'footprint', [-0.474026970 -0.236085370; -0.439392950 -0.319792950; ...
@@ -466,8 +472,14 @@ try
     scenario = robotScenario(UpdateRate = 1 / max(opts.dt, eps));
     addMesh(scenario, "Plane", Size = [14.5 11.5], ...
         Color = [0.88 0.88 0.88], Position = [0 0 -0.02]);
+    % Display-only wall height. Full-height walls occlude the robot, plan and
+    % trace from every useful camera angle; planning/collision are 2D and
+    % unaffected.
     for i = 1:size(boxes, 1)
         b = boxes(i, :);
+        if ~isempty(opts.wallDisplayHeight) && opts.wallDisplayHeight > 0
+            b(6) = min(b(6), opts.wallDisplayHeight); b(3) = b(6) / 2;
+        end
         if abs(b(7)) < 1e-9
             addMesh(scenario, "Box", Size = [b(4) b(5) b(6)], ...
                 Position = [b(1) b(2) b(3)], Color = [0.55 0.57 0.62]);
@@ -500,18 +512,26 @@ try
 
     ax3 = show3D(scenario);
     fig3 = ancestor(ax3, 'figure');
-    set(fig3, 'Visible', figVis, 'Color', 'w', 'Position', [70 70 1100 820]);
+    set(fig3, 'Visible', figVis, 'Color', 'w', 'Position', [70 70 1100 820], ...
+        'Name', 'MiR100 3D navigation', 'NumberTitle', 'off');
     axis(ax3, 'equal');
-    xlim(ax3, [-6.6 6.6]); ylim(ax3, [-5.1 5.1]); zlim(ax3, [0 2.4]);
-    view(ax3, [-40 24]);
+    zTop = 2.4;
+    if ~isempty(opts.wallDisplayHeight) && opts.wallDisplayHeight > 0
+        zTop = max(1.0, opts.wallDisplayHeight + 0.4);
+    end
+    xlim(ax3, [-6.6 6.6]); ylim(ax3, [-5.1 5.1]); zlim(ax3, [-0.05 zTop]);
+    view(ax3, opts.view3D);
     camlight(ax3, 'headlight');
     hold(ax3,'on');
     route=opts.wpsWorld;
     if isfield(trajLog,'waypoints') && ~isempty(trajLog.waypoints),route=trajLog.waypoints;end
-    plot3(ax3,route(:,1),route(:,2),.025*ones(size(route,1),1),'k--','LineWidth',1.3,'Tag','NavigationPlan');
-    plot3(ax3,route(end,1),route(end,2),.04,'rp','MarkerFaceColor','r','MarkerSize',12,'Tag','NavigationGoal');
-    executedTrace=plot3(ax3,x(1),y(1),.03,'b-','LineWidth',1.8,'Tag','NavigationTrace');
-    subtitle(ax3,'Dashed: commanded path | Blue: executed motion | Red: requested goal');
+    ov = drawNavOverlay3D(ax3, route, x, y, th, 1, opts);
+    % Readable in a dark MATLAB desktop theme as well.
+    set(ax3, 'Color', 'w', 'XColor', 'k', 'YColor', 'k', 'ZColor', 'k');
+    if ~isempty(opts.wallDisplayHeight) && opts.wallDisplayHeight > 0
+        notes{end+1} = sprintf(['3D view draws walls %.2f m tall (real 2.20 m) ' ...
+            'so the robot and path stay visible; display only.'], opts.wallDisplayHeight);
+    end
 
     [vw3, videoFile, profileUsed] = openLosslessWriter(outDir, ...
         'mir100_demo_3d', opts, canVideo);
@@ -540,13 +560,20 @@ try
             end
         end
         show3D(scenario, FastUpdate = true, Parent = ax3);
-        set(executedTrace,'XData',x(1:k),'YData',y(1:k),'ZData',.03*ones(k,1));
+        if ~isgraphics(ax3), break; end
+        % show3D may rebuild the axes contents; redraw the overlay if so.
+        if ~all(isgraphics([ov.plan ov.goal ov.trace ov.foot ov.head]))
+            hold(ax3, 'on');
+            ov = drawNavOverlay3D(ax3, route, x, y, th, k, opts);
+        else
+            updateNavOverlay3D(ov, x, y, th, k, opts);
+        end
         if ~isnan(minClear)
             if collided, cstr = 'COLLISION'; else cstr = 'clear'; end
-            title(ax3, sprintf('MiR100 imported meshes in hard world  t = %.2f s  (min clearance %.3f m, %s)', ...
-                t(k), minClear, cstr));
+            title(ax3, sprintf('MiR100 3D navigation  t = %.2f s  (min clearance %.3f m, %s)', ...
+                t(k), minClear, cstr), 'Color', 'k');
         else
-            title(ax3, sprintf('MiR100 imported meshes in hard world  t = %.2f s', t(k)));
+            title(ax3, sprintf('MiR100 3D navigation  t = %.2f s', t(k)), 'Color', 'k');
         end
         drawnow;
         if opts.showAnimation
@@ -564,8 +591,44 @@ catch ME
     notes{end+1} = sprintf( ...
         '3D scene animation failed (%s): %s. 2D top-down and robot stills remain.', ...
         ME.identifier, ME.message);
+    % Do not fail silently: the 3D view is the primary demo.
+    warning('make_demo:scene3DFailed', '%s', notes{end});
     videoFile = ''; profileUsed = ''; wheelForm = 'off';
 end
+end
+
+function ov = drawNavOverlay3D(ax, route, x, y, th, k, opts)
+% Plan, goal, start, executed trace and a footprint outline that follows
+% the robot, drawn just above the floor so they show between the walls.
+z = 0.03;
+ov.plan  = plot3(ax, route(:,1), route(:,2), z*ones(size(route,1),1), 'k--', ...
+    'LineWidth', 1.5, 'Tag', 'NavigationPlan');
+ov.start = plot3(ax, x(1), y(1), z, 'go', 'MarkerFaceColor', 'g', ...
+    'MarkerSize', 9, 'Tag', 'NavigationStart');
+ov.goal  = plot3(ax, route(end,1), route(end,2), z, 'rp', 'MarkerFaceColor', 'r', ...
+    'MarkerSize', 16, 'Tag', 'NavigationGoal');
+ov.goalPole = plot3(ax, route(end,1)*[1 1], route(end,2)*[1 1], [0 1.0], 'r-', ...
+    'LineWidth', 2, 'Tag', 'NavigationGoalPole');
+ov.trace = plot3(ax, x(1), y(1), z, 'b-', 'LineWidth', 2.2, 'Tag', 'NavigationTrace');
+ov.foot  = plot3(ax, nan, nan, nan, '-', 'Color', [0.1 0.4 0.95], ...
+    'LineWidth', 1.6, 'Tag', 'NavigationFootprint');
+ov.head  = plot3(ax, nan, nan, nan, '-', 'Color', [0.1 0.4 0.95], ...
+    'LineWidth', 2, 'Tag', 'NavigationHeading');
+legend(ax, [ov.plan ov.trace ov.foot ov.start ov.goal], ...
+    {'commanded path', 'executed motion', 'robot footprint', 'start', 'requested goal'}, ...
+    'Location', 'northeast', 'TextColor', 'k', 'Color', 'w', 'AutoUpdate', 'off');
+updateNavOverlay3D(ov, x, y, th, k, opts);
+end
+
+function updateNavOverlay3D(ov, x, y, th, k, opts)
+z = 0.03;
+R  = [cos(th(k)) -sin(th(k)); sin(th(k)) cos(th(k))];
+fp = (R * opts.footprint.').' + [x(k) y(k)];
+fp = [fp; fp(1,:)];
+set(ov.trace, 'XData', x(1:k), 'YData', y(1:k), 'ZData', z*ones(k,1));
+set(ov.foot, 'XData', fp(:,1), 'YData', fp(:,2), 'ZData', z*ones(size(fp,1),1));
+set(ov.head, 'XData', [x(k), x(k) + cos(th(k))*opts.footprintRadius], ...
+             'YData', [y(k), y(k) + sin(th(k))*opts.footprintRadius], 'ZData', [z z]);
 end
 
 function [vw, videoFile, profileUsed] = openLosslessWriter(outDir, baseName, opts, canVideo)

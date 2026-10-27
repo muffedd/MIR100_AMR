@@ -32,7 +32,15 @@ WHAT make_demo.m DOES (in order)
      meshes) animated INSIDE the actual world boxes:
        scenario = robotScenario(UpdateRate=1/dt)
        addMesh(scenario,"Plane",...) for the floor
-       addMesh(scenario,"Box",Size=[sx sy sz],Position=[xc yc zc]) per wall
+       addMesh(scenario,"Box",Size=[sx sy h],Position=[xc yc h/2]) per wall,
+         h = opts.wallDisplayHeight (default 0.6 m, display only). The real
+         2.2 m walls hid the 0.35 m robot, path and trace from every camera
+         angle; planning and clearance use the full 2D walls, unchanged.
+         Set opts.wallDisplayHeight = [] for full-height walls.
+       Overlay just above the floor: commanded path, executed trace, a
+         footprint outline + heading that follows the robot, start, goal
+         (with a vertical marker). Redrawn if show3D rebuilds the axes.
+         Camera: opts.view3D (default [-30 55]).
          (all 65 hard_world boxes have yaw=0, verified; the yaw~=0 path
           builds a "Custom" 8-vertex/12-triangle mesh, currently unexercised)
        platform = robotPlatform("mir100",scenario,RigidBodyTree=robot,
