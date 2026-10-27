@@ -1,0 +1,32 @@
+[PASS] link inventory  -- 20 links, missing=[], extra=[]
+[PASS] joint inventory+types  -- 19 joints, mismatches=[]
+[PASS] total mass 69.2390156 kg (tol 1e-3)  -- total=69.2390156 kg
+[PASS] base mass 58.0  -- base=58.0
+[PASS] left_wheel_link mass 1.0  -- 1.0
+[PASS] right_wheel_link mass 1.0  -- 1.0
+[PASS] fl_caster_rotation mass 0.3097539019  -- 0.3097539019
+[PASS] fr_caster_rotation mass 0.3097539019  -- 0.3097539019
+[PASS] bl_caster_rotation mass 0.3097539019  -- 0.3097539019
+[PASS] br_caster_rotation mass 0.3097539019  -- 0.3097539019
+[PASS] front_laser_link mass 2.0  -- 2.0
+[PASS] back_laser_link mass 2.0  -- 2.0
+[PASS] mirref_top_holes decorative link massless  -- 0.0
+[PASS] mirref_front_ports decorative link massless  -- 0.0
+[PASS] mirref_corner_caps decorative link massless  -- 0.0
+[PASS] wheel separation 0.445208 m (tol 1e-6)  -- sep=0.445208 (lead 0.4452)
+[PASS] wheel radius 0.0625 m from joint z (tol 1e-9)  -- z_left=0.0625, z_right=0.0625
+[PASS] wheel axle x offset 0.037646 m  -- x_left=0.0 (base_link frame; dx applies to base visual/CoM)
+[PASS] left_wheel_joint axis [0 1 0] continuous  -- axis=[0.0, 1.0, 0.0]
+[PASS] right_wheel_joint axis [0 1 0] continuous  -- axis=[0.0, 1.0, 0.0]
+[PASS] fl_caster_rotation axis [0 0 1] continuous  -- axis=[0.0, 0.0, 1.0]
+[PASS] fr_caster_rotation axis [0 0 1] continuous  -- axis=[0.0, 0.0, 1.0]
+[PASS] bl_caster_rotation axis [0 0 1] continuous  -- axis=[0.0, 0.0, 1.0]
+[PASS] br_caster_rotation axis [0 0 1] continuous  -- axis=[0.0, 0.0, 1.0]
+[PASS] all principal inertias > 0
+[PASS] mesh reference set (8 files)  -- missing_refs=[], extra_refs=[]
+[PASS] all mesh files exist  -- missing=[]
+[PASS] base_link keeps shell+band visuals  -- ['meshes/visual/mir_100_base.stl', 'meshes/visual/mirref/band.stl']
+[PASS] footprint v2 circumradius 0.6051644 (tol 1e-4)  -- circumradius=0.6051645, contract radius 0.6052 covers it: True
+[PASS] footprint v2 covers all wheel/caster/laser mounts  -- max mount radius=0.4893578 <= 0.6052
+
+30/30 checks passed

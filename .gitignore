@@ -1,0 +1,9 @@
+*.asv
+*.m~
+*.avi
+*.mj2
+*.mat
+!validation/validation_results.mat
+.vault/
+__pycache__/
+*.pyc

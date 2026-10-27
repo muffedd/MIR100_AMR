@@ -1,0 +1,16 @@
+{
+  "evidence": "Executed Python polygon reference, not MATLAB execution or controller trajectory",
+  "trajectory_model": "Straight route segments, with shortest in-place rotations at each waypoint; initial yaw 0",
+  "sample_count": 999,
+  "max_linear_sample_step_m": 0.03,
+  "max_yaw_sample_step_rad": 0.02,
+  "min_sampled_clearance_m": 0.14534133016163164,
+  "nearest_wall": "w24",
+  "minimum_pose": [
+    -4.31,
+    0.0,
+    1.0172219678978511
+  ],
+  "any_sampled_collision": false,
+  "continuous_clearance_lower_bound_m": 0.1393591491531717
+}

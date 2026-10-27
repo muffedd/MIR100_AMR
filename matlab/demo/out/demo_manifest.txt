@@ -1,0 +1,21 @@
+make_demo manifest
+created:          2026-10-27 08:16:48
+matlab version:   25.2.0.2998904 (R2025b)
+capture mode:     HEADLESS: NO video produced; keyframe PNGs only. Do not present keyframes as the video demo.
+csv:              C:\Users\maxil\Downloads\MATLAB-AMR-MiR100-1da4a1f\MATLAB-AMR-MiR100\matlab\assets\hard_world_boxes.csv
+robot asset:      C:\Users\maxil\Downloads\MATLAB-AMR-MiR100-1da4a1f\MATLAB-AMR-MiR100\matlab\assets\mir_description\urdf\mir100_matlab.urdf
+footprint:        v2 caster-full-coverage (project, 2026-10-27); radius 0.6052
+base z (m):       0.0625  [URDF-derived (home-config lowest frame minus wheel radius)]
+boxes:            65
+traj samples:     1639
+sim time (s):     16.380
+route length (m): 14.821
+min clearance (m): 0.2213
+collision:        0
+wheel animation:  vector
+3D scene video:   (none)
+topdown video:    (none)
+video profiles:   3D=(none) topdown=(none) (lossless)
+robot views:      3
+note:             Rendered caller-supplied trajLog (core run).
+note:             HEADLESS: NO video produced; keyframe PNGs only. Do not present keyframes as the video demo.

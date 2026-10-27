@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>mir_description</name>
+  <version>2.0.0</version>
+  <description>ROS 2 Jazzy MiR100 description and basic simulation package.</description>
+
+  <maintainer email="local@example.com">Local Workspace</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>joint_state_publisher</depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>rviz2</depend>
+  <depend>xacro</depend>
+
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

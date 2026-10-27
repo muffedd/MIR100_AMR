@@ -1,0 +1,171 @@
+================================================================================
+MiR100 AMR MATLAB project - VALIDATION MODULE: PREDECLARED TEST SPEC (TESTS.txt)
+Owner: matlab/validation. Runner: run_validation.m (same folder).
+Written BEFORE any execution. Thresholds are fixed below and are not tuned
+after seeing results. Status semantics are strict: no PASS without measured
+values produced by the live run in that invocation.
+================================================================================
+
+STATUS SEMANTICS
+  PASS    all criteria met on values measured in THIS run
+  FAIL    a criterion was evaluated on real measurements and not met
+  NOTRUN  a prerequisite is absent (no MATLAB, toolbox, contract function,
+          or data file); the test was not executed
+  ERROR   execution started but threw, or a contract output was missing
+          required fields; nothing is inferred
+  SKIP    optional/non-gating check deliberately not executed
+
+No fabrication: empty metrics, missing fields, missing files, or missing
+MATLAB never produce PASS or invented counts. Any contract ambiguity is
+reported, not smoothed over.
+
+DECLARED MODEL CONSTANTS (verified, not assumed, by T4)
+  wheelRadius     = 0.0625 m     (tol 1e-3)
+  wheelSeparation = 0.4452 m     (tol 1e-3)   [differentialDriveKinematics.TrackWidth]
+  totalMass       = 69.239 kg    (tol 1e-2)
+  footprintRadius = 0.6052 m     (tol 5e-3)   [6 mm edge-expanded hull;
+    covers swivel caster sweep from URDF collision meshes incl. caster STL at
+    mir_100 v1 xacro lines ~124-129; supersedes the old 0.5988 polygon, which
+    was 5.24 mm short on swivel coverage]
+  footprint polygon (base frame, m):
+    (-0.474026970,-0.236085370) (-0.439392950,-0.319792950)
+    (-0.355791680,-0.354382980) ( 0.493049750,-0.295637190)
+    ( 0.548024070, 0.236692380) ( 0.513392950, 0.320392950)
+    ( 0.429789310, 0.354983960) (-0.417838050, 0.295633920)
+  wall box count  = 65 (ground excluded; boxes are Nx7 [xc,yc,zc,sx,sy,sz,yaw],
+                    metres/radians, sx,sy,sz > 0, |yaw| <= pi)
+
+FRAME CONVENTION
+  world = map + [-4.31, -2.81].  spawn(world) = [-4.31, -2.81].
+  goal(world)   = [4.31, 0.56].
+  Route v2 (map frame, 16 waypoints):
+    (0,0) (0,1.12) (0,2.81) (0.56,3.09) (1.12,3.37) (1.12,4.5) (1.12,5.62)
+    (2.25,5.62) (3.37,5.62) (4.5,5.62) (5.25,5.25) (5.25,4.12) (5.25,3.37)
+    (6.75,3.37) (7.87,3.37) (8.62,3.37)
+
+TESTS
+-----
+T1  Route tracking and collision freedom.
+    Consumes: boxes=read_world_boxes(csv); scen=build_world(csv);
+              robot=load_mir100(urdf); plat=spawn_mir100(scen,robot);
+              trajLog=follow_route(plat,commandedRoute,opts), where
+              commandedRoute = the global plan from plan_path when one
+              exists, else the predeclared v2 route (diagnosticOnly=true).
+              LOCKED SCHEMA:
+              trajLog has t, x, y, yaw, wheelAngles (Nx2), waypoints,
+              reachedIdx, diagnosticOnly, plannerStatus. reachedIdx,
+              plannerStatus and diagnosticOnly are recorded as evidence;
+              diagnosticOnly=true raises a warning in the T1 details.
+              opts.maxSimTime is honored by follow_route (default 600 s).
+    Measures: per-waypoint min distance of logged (x,y); footprint collision
+              count computed INDEPENDENTLY by the validation module: the
+              conservative footprint polygon is transformed to each logged
+              (x,y,yaw) and tested against every wall box (2-D SAT, OBB vs
+              polygon) using the boxes from read_world_boxes.
+    PASS:   every COMMANDED waypoint captured (trajLog.reachedIdx covers
+            all commanded waypoints; min-distance <= 0.15 m fallback when
+            reachedIdx is absent) AND final goal within <= 0.15 m AND
+            collision count == 0. The predeclared 16-waypoint v2 route
+            distance is recorded as diagnostic evidence only, never gated.
+            SPEC CHANGE: grading a planned path
+            against the v2 route false-failed a valid plan (9/16 v2
+            waypoints > 0.15 m off a valid 0.6052-inflation plan, worst
+            0.658 m); T1 now grades the COMMANDED route.
+
+T2  Clearance.
+    Consumes: same trajLog and boxes as T1.
+    Measures: minimum footprint-to-box distance over the whole trajectory
+              (independent polygon distance; 0 on overlap) as PRIMARY value;
+              clearLog=check_run_clearance(trajLog,boxes) is recorded as a
+              CROSS-CHECK when available. LOCKED SCHEMA (project,
+              supersedes earlier aliases): clearLog has t, minDist (Nx1),
+              minOverall (scalar, m), minAt (x,y,t,box), collision. The
+              runner reads minOverall (minClearance tolerated as extra alias,
+              minDist derivable); NaN + note if absent.
+    PASS:   primary min clearance > 0 m.
+
+T3  Tracking error vs planned path.
+    Consumes: map=build_map(boxes,res,[]) (boxes Nx7 or CSV path, NOT
+              a robotScenario handle; res=0.05 m/cell default; [] =
+              auto origin from wall extents);
+              ok=check_map(map,boxes,res,originXY) recorded as evidence;
+              path=plan_path(map,spawnWorld,goalWorld,inflateM), inflateM
+              DECLARED = 0.6052 m (polygon v2); trajLog from T1.
+    Measures: distance of each logged (x,y) to the nearest point on the
+              planned path polyline; max and RMS.
+    PASS:   max error <= 0.20 m AND RMS error <= 0.20 m.
+    Empty path from plan_path is a FAIL (criterion cannot be met), not a skip.
+
+T4  Unit/frame/wheel checks.
+    Consumes: robot=load_mir100(urdfPath); report=verify_robot(robot);
+              boxes=read_world_boxes(csv).
+    Checks: wheelRadius, wheelSeparation, footprintRadius vs the
+            declared constants above; mass gated as importedMass vs
+            declaredSourceMass - both derived at RUNTIME (actual tree sum
+            after load_mir100's zero-mass normalization of the 7 source
+            links without <inertial>, vs the URDF inertial parse). No
+            hardcoded mass constant, no subtract scheme. Also
+            footprintPolygon vertex-wise vs the
+            locked v2 polygon (tol 1e-6 m). LOCKED SCHEMA (project):
+            report has linkCount, jointCount, massTotal, wheelRadius,
+            wheelSeparation, footprintRadius, footprintPolygon, checks
+            (name/value/expected/tol/pass), pass. A missing field is ERROR,
+            never assumed; the module's own pass/checks are recorded as
+            evidence (not gating). Boxes: Nx7, finite, positive sizes,
+            |yaw| <= pi, count == 65; map->world offset consistency of
+            spawn/goal/route.
+    PASS:   every subcheck within tolerance.
+
+T5  Open-loop kinematic accuracy (independent of the project modules).
+    Uses differentialDriveKinematics (Robotics System Toolbox, R2019b+) with
+    WheelRadius=0.0625, TrackWidth=0.4452, Euler integration at dt=0.05 s.
+    SCOPE: T5 is a kinematic SELF-CONSISTENCY check of the motion model
+    object. It is NOT independent physical validation of the URDF (no
+    dynamics, no slip, no mass/inertia exercise).
+    (a) straight: v=0.25 m/s for 8.0 s  -> expected 2.0 m,  tol 0.02 m
+    (b) turn:     w=0.5 rad/s for pi/0.5 s -> expected pi rad, tol 0.02 rad
+    (c) VehicleInputs='WheelSpeeds', [v/r v/r] -> expected 2.0 m, tol 0.02 m
+    PASS: all three within tolerance.
+
+T6  Sim/wall time ratio (REPORT ONLY).
+    Measures: simTime = trajLog.t(end)-trajLog.t(1); wallTime around
+              follow_route; ratio = sim/wall.
+    PASS:   ratio measured and reported. NO threshold, by design.
+            This is a single-machine indicator, NOT a realtime guarantee.
+
+AUX-LIDAR (non-gating): if lidar_react(plat,scen,path,opts) exists and a run
+is available, it is executed once as a smoke check. No criteria; not part of
+T1..T6 pass/fail.
+
+VERIFIED API SOURCES (checked 2026-10-27 against MathWorks docs):
+  https://www.mathworks.com/help/robotics/ref/robotscenario.html
+  https://www.mathworks.com/help/robotics/ref/importrobot.html
+  https://www.mathworks.com/help/robotics/ref/differentialdrivekinematics.html
+  https://www.mathworks.com/help/nav/ref/binaryoccupancymap.html
+  https://www.mathworks.com/help/nav/ref/validatoroccupancymap.html
+  https://www.mathworks.com/help/nav/ref/plannerrrtstar.html
+  https://www.mathworks.com/help/robotics/ug/perform-obstacle-avoidance-in-warehouse-scenario-with-mobile-robots.html
+  Notes: the motion controller object is controllerPurePursuit (no
+  "purePursuit" object exists; that doc page is a Simulink block). Scenario
+  lidar uses robotLidarPointCloudGenerator + robotSensor, not a "lidarSensor"
+  class. binaryOccupancyMap(scenario, MapHeightLimits=[...]) builds the map
+  directly from a robotScenario.
+  RUN-AS-IS: no guarantee without a MATLAB installation containing Robotics
+  System Toolbox and Navigation Toolbox; this workspace has neither.
+
+ENVIRONMENT STATUS AT HANDOVER (2026-10-27, Asia/Kolkata)
+  This workspace has NO MATLAB and NO Octave. The suite has therefore NOT
+  been executed here: overall run record status = NOTRUN.
+  Evidence available at handover:
+    - static structure check of run_validation.m (block/paren/quote balance,
+      per-line inspection; no interpreter available)
+    - API verification against official MathWorks documentation (see report)
+  First real execution on a MATLAB machine must run:
+      results = run_validation();
+  and archive validation_results.txt / validation_results.mat.
+
+SCOPE NOTE
+  This is evidence for a CORE KINEMATIC DEMO. It is NOT physical validation
+  (no dynamics, no slip model) and NOT a realtime guarantee. The earlier
+  Gazebo hard-world failures are not reproduced or disproven here.
+================================================================================

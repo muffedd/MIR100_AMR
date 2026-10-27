@@ -1,0 +1,43 @@
+{
+  "evidence": "Executed Python reference only; MATLAB code not executed",
+  "edge_cases": [
+    "separated",
+    "shared_edge",
+    "corner",
+    "B_contained",
+    "A_contained",
+    "cross_without_vertices",
+    "degenerate_edge"
+  ],
+  "random_sat_and_rigid_invariance_cases": 400,
+  "interpolation_bound_cases": 80,
+  "interpolation_dense_probes_per_case": 31,
+  "interpolation_max_bound_violation_m": 0.0,
+  "footprint_verification": {
+    "fixed_mesh_halfspace_max_signed_m": -0.028031444208337197,
+    "fixed_mesh_max_radius_m": 0.5471558777962295,
+    "envelope_radius_m": 0.6051644103211994,
+    "caster_all_angles_bound_radius_m": 0.10196318885249485,
+    "caster_attainable_vertex_radius_m": 0.10196318885249485,
+    "caster_envelope_min_margin_m": 0.0007599235526160181,
+    "caster_sweep_contained": true,
+    "drive_wheel_spin_contained": true,
+    "original_polygon_caster_all_angles_min_margin_m": -0.005240073803847625,
+    "original_polygon_encloses_all_caster_angles": false,
+    "fixed_mesh_vertices_checked": 74844
+  },
+  "world": {
+    "wall_count": 65,
+    "start_clearance_m": 1.1369759299999997,
+    "nearest_wall": "w53",
+    "start_pose": [
+      -4.31,
+      -2.81,
+      0
+    ],
+    "world_height_range_m": [
+      0.0,
+      2.2
+    ]
+  }
+}

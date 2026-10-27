@@ -1,0 +1,21 @@
+run_validation report - 2026-10-27 08:17:39
+MATLAB 25.2.0.2998904 (R2025b) | RST present: 1 | Navigation Toolbox present: 1
+csv: C:\Users\maxil\Downloads\MATLAB-AMR-MiR100-1da4a1f\MATLAB-AMR-MiR100\matlab\assets\hard_world_boxes.csv
+urdf: C:\Users\maxil\Downloads\MATLAB-AMR-MiR100-1da4a1f\MATLAB-AMR-MiR100\matlab\assets\mir_description\urdf\mir100_matlab.urdf
+
+[PASS  ] T4        unit/frame/wheel checks
+          all 11 subchecks within tolerance
+[PASS  ] T5        straight 2 m / turn pi accuracy
+          straight err 0.0000 m, turn err 0.0084 rad, wheel-input err 0.0000 m
+[PASS  ] T1        commanded-waypoint capture + final goal; zero footprint collision
+          277/277 commanded waypoints captured (reachedIdx 277/277 commanded), goal 0.100 m, 0 collisions over 1639 poses.
+[PASS  ] T2        min clearance > 0
+          min clearance 0.2213 m (independent); contract fn: 0.2213 m
+[PASS  ] T3        max/RMS tracking error <= 0.20 m
+          max 0.114 m, RMS 0.022 m vs planned path (1639 poses)
+[PASS  ] T6        sim/wall time ratio (report only, NOT a realtime guarantee)
+          sim 16.38 s in 40.59 s wall (ratio 0.404). Single-machine measurement; NOT a realtime guarantee.
+[PASS  ] AUX-LIDAR lidar_react smoke (non-gating)
+          lidar_react executed without error (smoke only, no criteria)
+
+Core kinematic demo evidence only: NOT physical validation and NOT a realtime guarantee.

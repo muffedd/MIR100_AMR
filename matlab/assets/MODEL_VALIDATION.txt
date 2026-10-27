@@ -1,0 +1,139 @@
+================================================================
+MiR100 SIMULATION MODEL - BOUNDED VALIDATION REPORT
+Date: 2026-10-26. Model: mir100_ref. Tests ran at repo head 872d847;
+this report and harness were added later (model files unchanged).
+Scope: simulation self-consistency only (command -> odometry ->
+Gazebo ground truth). No physical MiR100 data has been collected,
+so this is not hardware or digital-twin validation.
+================================================================
+
+----------------------------------------------------------------
+1. HOW TO REPRODUCE
+----------------------------------------------------------------
+Tested environment: robostack (micromamba) ROS 2 Jazzy + Gazebo
+Harmonic on Linux, Python with gz transport bindings (gz.transport13).
+The /opt/ros/jazzy paths below are the native-Ubuntu equivalent; the
+native apt path itself has not been run end-to-end by the author.
+
+Terminal 1 (build once, then):
+  source /opt/ros/jazzy/setup.bash && source install/setup.bash
+  ros2 launch mir_description gazebo.launch.py gui:=false
+Terminal 2 (bridges):
+  source /opt/ros/jazzy/setup.bash && source install/setup.bash
+  ros2 run ros_gz_bridge parameter_bridge \
+    /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock \
+    /cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist \
+    /odom@nav_msgs/msg/Odometry[gz.msgs.Odometry
+Terminal 3 (harness: scripts/validate_model.py in this repo):
+  python3 scripts/validate_model.py --mode straight --trials 3 --out /tmp/straight.csv
+  python3 scripts/validate_model.py --mode turn --trials 3 --out /tmp/turn.csv
+
+Method: the harness waits for /odom and ground truth to stream, then
+waits a 2 sim-second baseline, publishes a constant cmd_vel profile
+for a fixed number of SIM seconds (/clock), and lets the robot settle
+3 sim-seconds. It logs cmd, /odom, and Gazebo ground truth (model
+pose from /world/empty/pose/info via gz transport) to CSV and
+compares odometry vs ground truth between pre-drive and post-settle
+samples. A fresh-process check after the baseline fix measured
+odom 1.966 / GT 1.971 m vs the recorded 1.980 / 1.985 m runs below;
+expect ~1% run-to-run spread from startup timing, not exact
+reproduction of recorded values.
+
+----------------------------------------------------------------
+2. STATIC CONFIGURATION AUDIT (actual runtime SDF)
+----------------------------------------------------------------
+Source: xacro -> URDF -> "gz sdf -p" (what the simulator loads).
+- Footprint collision box: 0.9 x 0.58 m. OEM spec sheet: 890 x 580 mm.
+  NOT exact: the model is 10 mm longer. Spec source (full URL):
+  https://howtorobot.com/sites/default/files/2021-02/MiR100%E2%84%A2%20_%20Mobile%20Industrial%20Robots_0.pdf
+- Drive wheel radius 0.0625 m = OEM nominal 125 mm diameter (nominal
+  match only; no tolerance comparison).
+- Wheel separation 0.4452 m; no public OEM figure found; unverified.
+- Collision outline INCLUDING sensor pods: front laser at
+  (0.4288, 0.2358) and back laser at (-0.3548, -0.2352), each a
+  0.16 x 0.16 m collision box (pod joints rotate them 45 degrees;
+  rotated extent 0.591 m, unrotated 0.599 m - a consistent outline
+  must cover both). Worst-case corner radius from the rotation
+  origin: 0.599 m (front laser pod). The chassis box alone needs
+  0.567 m although its half-diagonal is only 0.536 m, because the
+  box center is offset +0.038 m ahead of the rotation origin
+  (front corners at x=0.4876: sqrt(0.4876^2+0.29^2)=0.567). A geometry-consistent Nav2 robot_radius must be at
+  least ~0.60 m; the default 0.53 leaves the laser pods uncovered.
+- Masses as loaded: base_footprint lump 62.0 kg (base_link 58.0 +
+  the two laser links at a declared 2.0 kg each); 2 drive wheels at
+  1.0 kg; 4 caster assemblies at ~1.31 kg. Total 69.239 kg vs OEM
+  70 kg: 1.1% under, coincidental (declared approximations, not
+  tuned to the spec sheet). Laser 2.0 kg values are pre-existing
+  declared approximations without a cited datasheet.
+- Decorative mirref visual links are massless (lumped at zero mass;
+  valid URDF, zero dynamics impact by construction).
+- Inertias: uniform-box formula (base), cylinder formula (wheels),
+  explicit tensor (caster bases). Approximations.
+- Drive: gz-sim DiffDrive; max linear accel 1.0 m/s^2; max angular
+  accel 1.5 rad/s^2; odometry publish rate 50 Hz (configured).
+- Friction: the model specifies no surface friction. The SDF default
+  is mu = mu2 = 1.0 (SDFormat specification, link > friction element:
+  http://sdformat.org/spec?ver=1.11&elem=link). Whether Gazebo
+  Harmonic's physics engine applied exactly these defaults was NOT
+  independently verified at runtime.
+- Scanners: 2x gpu_lidar, 541 samples, -2.2689..+2.3562 rad (~265
+  degrees), 0.05-29.0 m, 12.5 Hz configured target (achieved rate
+  not measured). Earlier live checks on this model: zero self-hits;
+  obstacle response within 0.03 m of geometric prediction.
+
+----------------------------------------------------------------
+3. RUNTIME RESULTS (measured)
+----------------------------------------------------------------
+STRAIGHT, 0.2 m/s for 10.0 sim-s, 3 trials (all identical):
+  odometry 1.980 m | ground truth 1.985 m | odom-GT gap 0.005 m (0.25%)
+  lateral drift 0.000 m | heading change 0.00 deg
+  Command-vs-GT -0.75%, consistent with the 1.0 m/s^2 accel ramp.
+TURN, 0.5 rad/s for 6.283 sim-s (commanded integral 180.0 deg):
+  wheel-joint integral 175.0 deg; /odom 175.3 deg (wheel-vs-odom
+  agreement 0.3 deg at this operating point).
+  Ground-truth body rotation, 4 observed trials:
+    first turn after straight travel: 147.2 deg, 147.3 deg (2 trials)
+    subsequent turns (casters already tangent): 164.0, 164.0 (2 trials)
+  Wheel/body disagreement: 28 deg on a first turn, 11 deg steady-state.
+  Instrumented run: caster swivels approached the correct tangent
+  angles (within ~7 deg) but started straight-travel-aligned and
+  scrubbed while swiveling in; drive wheels tracked commanded
+  velocity closely in cruise (1.781 vs 1.781 rad/s expected).
+Interpretation (bounded): wheels and odometry agree at the tested
+operating points. The wheel/body disagreement is CONSISTENT WITH
+wheel-ground and caster scrub slip at the default friction; that
+causality is not proven, and whether it matches real MiR100 physics
+is unknown (no hardware data collected).
+
+----------------------------------------------------------------
+4. KNOWN LIMITATIONS (all open)
+----------------------------------------------------------------
+- Rotation: the body under-rotates vs wheel odometry by ~6%
+  steady-state and ~16% on the first turn after straight travel.
+- Single operating points tested (0.2 m/s; 0.5 rad/s); no speed sweep.
+- Hard-map guided route: NOT validated as a continuous run. In two
+  DRIVER sessions against one long simulation (driver restart only,
+  no sim restart): session one passed 4 legs by map belief, then its
+  driver looped 559 repeat goals on one waypoint (driver bug: no
+  increment-on-success while the robot sat 0.63 m from the waypoint,
+  outside its 0.6 m skip threshold; why Nav2 instantly reported each
+  repeat goal as succeeded is UNEXPLAINED - the goal tolerance was
+  0.25 m and a rigid transform preserves distances, so a transform
+  explanation is unproven). Session two passed 10 further legs by map
+  belief. "Passed" means Nav2 reported success in its own map frame;
+  motion was not continuously GT-validated. Final ground-truth
+  distance to the route goal: 0.589 m. Waypoints were derived from
+  ground-truth world geometry; unexplored-map autonomy is not claimed.
+- Conservative hard-test params (robot_radius 0.60 / inflation 0.90)
+  have never completed a route; the passing legs used the default
+  0.53 / 0.70, which per section 2 does not enclose the sensor pods.
+  (An earlier revision of this file said 0.55 - that was a reporting
+  error; the repo's actual default inflation_radius is 0.70 in both
+  costmaps. Geometry justifies enclosing the 0.599 m outline only;
+  inflation is separate tuning, never geometry-dictated.)
+- RECORDED RUNS 2026-10-26: two bounded pre-registered trials with a
+  footprint polygon (0.5988 m hull) replacing robot_radius BOTH
+  FAILED to complete the hard-world route (legs 4 and 5 aborted).
+  Full record: docs/HARD_WORLD_VALIDATION.txt. Hard-world navigation
+  is NOT validated.
+- No physical data collected.

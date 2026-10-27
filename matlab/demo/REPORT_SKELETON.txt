@@ -1,0 +1,106 @@
+PROJECT REPORT SKELETON - MiR100 AMR in MATLAB (hard_world)  [rev3]
+===================================================================
+Status date: 2026-10-27 (IST). Demo-module module author. Rev3 = integration repair round 2.
+
+0. PROVENANCE
+   Source: github.com/muffedd/ROS_mir100 @ commit 6450a77.
+   World:  src/mir_description/worlds/hard_world.sdf - parsed by this
+           module author from the actual file: 65 wall boxes (w0..w64),
+           ground_plane and observer_cam excluded BY IDENTITY; every box
+           has roll = pitch = 0 AND yaw = 0 (all 65 axis-aligned today;
+           contract still supports yaw).
+           OUTER extent from box edges (centers +/- half sizes, verified):
+           x in [-6.3755, 6.3755], y in [-4.8755, 4.8755].
+           All walls zc = 1.1, sz = 2.2 (uniform 2.2 m height).
+   Robot:  canonical FLAT URDF ships under the matlab/assets tree
+           (project supplies the exact path via opts.urdfPath;
+           make_demo errors if none given, never auto-picks). Upstream
+           repo ships only .urdf.xacro - upstream state, NOT current.
+           Wheel joints (upstream xacro, empty prefix): left_wheel_joint,
+           right_wheel_joint (mir.urdf.xacro diff-controller comment).
+
+1. MODEL PARAMETERS (verified vs leads)
+   wheel radius      0.0625 m   VERIFIED (mir_100_act_wheel_radius)
+   wheel separation  0.4452 m   VERIFIED (2 x mir_100_act_wheel_dy 0.222604)
+   base mass         58.0 kg    VERIFIED property; total 69.239 kg remains
+                                an project LEAD, not re-derived.
+   footprint         v2 radius 0.6052 m (caster full coverage); v2
+                                8-vertex polygon literal supplied by lead
+                                and now the demo default (v1 removed).
+   base height       grounded, not assumed: opts.baseZ override >
+                     plat.InitialBasePosition(3) (spawn height preserved)
+                     > URDF-derived (lowest home-config frame minus wheel
+                     radius). Recorded with its source in the manifest.
+
+2. CONTRACT REGISTRY (project canonical)
+   boxes    = read_world_boxes(csv)        Nx7 [xc yc zc sx sy sz yaw] m/rad
+   scen     = build_world(csv)
+   robot    = load_mir100(urdfPath)        flat canonical mir100_matlab asset
+   plat     = spawn_mir100(scen, robot)
+   map      = build_map(scen, res, originXY)
+   ok       = check_map(map, boxes, res, originXY)
+   report   = verify_robot(robot)
+   trajLog  = follow_route(plat, wpsWorld, opts)
+              opts FLAT: dt, maxLinVel, maxAngVel, wpRadius, goalRadius,
+              maxSimTime, scenario (handle). trajLog fields t x y yaw
+              wheelAngles(:,[left right]).
+   clearLog = check_run_clearance(trajLog, boxes)
+              canonical fields: minOverall, minDist, t, minAt, collision.
+   path     = plan_path(map, startXY, goalXY, inflateM)
+   reactOut = lidar_react(plat, scen, path, opts)
+   results  = run_validation()
+
+3. RUN ORDER (root entry point owned by project)
+   1 read_world_boxes -> 2 build_world -> 3 load_mir100 ->
+   4 spawn_mir100 -> 5 verify_robot -> 6 build_map -> 7 check_map ->
+   8 plan_path -> 9 follow_route -> 10 check_run_clearance ->
+   11 lidar_react -> 12 run_validation -> 13 make_demo (this module).
+
+4. API VERIFICATION (MathWorks official docs, fetched 2026-10-27)
+   importrobot: URDF/Xacro/SDF -> rigidBodyTree (Robotics System Toolbox).
+   robotScenario/robotPlatform/addMesh/show3D/move: Robotics System
+   Toolbox, Introduced R2022a. move(platform,"base",motion16) with
+   motion16 = [x y z vx vy vz ax ay az qw qx qy qz wx wy wz], quaternion
+   w-first. addMesh has NO rotation name-value: yaw~=0 boxes need the
+   "Custom" mesh path (current world is all yaw=0, verified).
+   VideoWriter 'Uncompressed AVI' = uncompressed RGB24 (lossless);
+   'Archival' = lossless MJ2; MPEG-4 NOT available on Linux -> avoided.
+   All demo video is lossless end to end.
+
+5. FLAGS / OPEN ITEMS
+   F1 CLOSED: flat mir100_matlab asset ships at integrated root; the
+      "xacro only" observation was upstream-repo state.
+   F2 CLOSED: follow_route opts canonical FLAT fields adopted; demo
+      passes scenario handle as simOpts.scenario = scen (confirm scen is
+      the intended handle).
+   F3 CLOSED: clearLog canonical schema (minOverall/minDist/t/minAt/
+      collision) adopted for overlays and manifest.
+   F4 originXY for build_map must cover the OUTER extent
+      [-6.3755,6.3755] x [-4.8755,4.8755] plus inflation margin.
+   F5 CLOSED (rendering side): demo animates wheel joints from
+      trajLog.wheelAngles(:,[left right]) via move(platform,"joint",cfg),
+      name-mapped (default left_wheel_joint/right_wheel_joint, override
+      opts.wheelJointNames). Control module owns column order semantics.
+   F6 MATLAB execution: NOTHING has run in MATLAB yet (no runtime in
+      this environment; lead is checking MATLAB Online). Evidence: SDF
+      parse (Python), doc verification, static review, MISS_HIT lint
+      (mh_lint: no parse errors, only low-severity name-value-pair
+      notes matching documented syntax), Python reference render
+      (labelled NOT MATLAB). HEADLESS RUNS PRODUCE NO VIDEO.
+   F7 Gazebo hard-world runs FAILED twice; cause (turn slip?) unproven;
+      not evidence about MATLAB. Kinematic demo is NOT physical
+      validation; no realtime guarantees.
+   F8 CLOSED: v2 footprint polygon literal supplied by lead and adopted
+      as the demo default; radius 0.6052. v1 polygon removed.
+   F9 OPEN: simOpts.scenario = scen (build_world handle) - confirm that
+      is the scenario handle the control module expects.
+
+6. EVIDENCE LOG
+   - hard_world.sdf @6450a77 parsed: 65 boxes, all yaw=0, extents as in
+     section 0 (this module author, Python, 2026-10-27).
+   - xacro properties read from repo: section 1.
+   - MathWorks docs fetched (URLs in README.txt).
+   - demo_reference_NOT_MATLAB.png: Python matplotlib geometry render.
+     NOT MATLAB OUTPUT. Not a run result. Not the demo.
+   - MATLAB run logs, 3D scene video, screenshots: PENDING (project
+     run with MATLAB access).

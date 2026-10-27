@@ -1,0 +1,186 @@
+INTEGRATION NOTES - MiR100 MATLAB AMR build (2026-10-27, 12-module build)
+========================================================================
+OVERALL: core pipeline assembled, statically reviewed, Python-reference
+checked. NOT MATLAB-EXECUTED anywhere. First execution target: licensed
+MATLAB R2022a+ (desktop) or MATLAB Online with a license covering
+Robotics System Toolbox + Navigation Toolbox.
+
+PER-MODULE STATUS
+---------------
+world      COMPLETE. read_world_boxes/build_world; 65/65 walls verified
+           against hard_world.sdf @ 6450a77 (independent re-parse).
+           Fix: header accepts id|name (project).
+assets     COMPLETE. Canonical URDF mir100_matlab.urdf (20 links/19
+           joints, 10 movable, 8 mesh refs resolve, mass 69.239 kg,
+           collision = primitives incl. caster wheel cylinders
+           r=0.0625 len=0.032). Footprint CSV updated to polygon v2.
+map        COMPLETE. occupancyMap branch verified against official
+           docs (flipud occupancy, GridLocationInWorld, Resolution
+           read-only, worldXY). Fix: CSV path via read_world_boxes
+           (raw readmatrix broke on the id column). run_all passes
+           auto-derived map origin (was wrongly the robot spawn).
+robot      COMPLETE. Locked schema report (linkCount/jointCount/
+           massTotal/wheelRadius/wheelSeparation/footprintRadius/
+           footprintPolygon/checks/pass). 30/30 Python reference.
+           First return used the WRONG classic model; reworked to the
+           canonical ref model.
+planning   COMPLETE (design). Deterministic A* on the inflated grid,
+           fails closed. Diagonal pad (sqrt(2)+0.05) cells covers
+           grid quantization worst case. LOS smoothing REMOVED by
+           project (sampled LOS is not exact supercover; the raw
+           A* grid path is already certified collision-free on the
+           inflated grid). Default inflation 0.6052 (was 0.5988).
+           At 0.6052 m inflation the planner either returns a path
+           (followed non-diagnostically) or reports BLOCKED with its
+           reason - both are true findings; never shrink inflation to
+           force a path. Verified by Python replication of build_map +
+           plan_path on the shipped 65-box world (res 0.05, auto
+           origin): PATH FOUND, 15.20 m, 277 waypoints. Earlier
+           "expected BLOCKED" text came from a synthetic 1.125 m
+           corridor probe, not the actual world - corrected.
+control    COMPLETE. Manual pure pursuit (no controllerPurePursuit -
+           avoids the R2026a API change). Locked trajLog schema
+           (t/x/y/yaw/wheelAngles/waypoints/reachedIdx/
+           diagnosticOnly/plannerStatus + extras). Python reference:
+           16/16 waypoints, final error 0.0997 m, 21.93 s.
+           plannerStatus field = FOLLOW status only; the global
+           planner status is tracked separately in run_all.
+collision  COMPLETE. polygon_clearance/check_run_clearance,
+           canonical clearLog (t/minDist/minOverall/minAt/collision
+           scalar). MISS_HIT lint clean (static, not execution).
+           Polygon v2 proof: 74,844 mesh vertices, old edge -5.240 mm
+           / new +0.760 mm, radius 0.6051644 -> 0.6052.
+           INTEGRATED CROSS-CHECK (project-run): the control
+           module's actual smooth trajectory (2193 steps) checked
+           against all 65 walls with polygon v2 -> min sampled
+           clearance 15.82 mm (tightest at t=15.18 s,
+           pose (1.014, 2.253, -1.242)). Coarse continuous bound was
+           negative (-3.7 mm), so the check was refined: 2 ms
+           resampling (5x) gives min 15.45 mm with a local
+           displacement bound of 2.67 mm -> CERTIFIED continuous
+           lower bound +12.78 mm collision-free. Corner cutting
+           exists but does not touch walls.
+reaction   OPTIONAL, NOT GATING, NOT CORE. v2: SE2 lattice planner,
+           no inflation shrinking, own 2-D ray caster (NOT
+           robotLidarPointCloudGenerator - that path is UNIMPLEMENTED).
+           Python: 2 blocked-corridor cases fail closed, 2 replanned
+           pass, 1 off-route pass. Independent review of the SE2 mask
+           conservatism still pending (sampled poses, not full swept
+           proof). Default footprint corrected to v2 by project.
+validation COMPLETE with project patches: verify_robot report.pass
+           now GATING for T4 (was evidence-only); strict canonical
+           clearLog (minClearance alias removed); T1 returns
+           DIAGNOSTIC-PASS (never a global-navigation PASS) when
+           trajLog.diagnosticOnly is true. All tests NOTRUN until
+           MATLAB execution.
+demo       COMPLETE. make_demo v3: explicit URDF path required,
+           polygon v2 literal, wheel joint animation from trajLog
+           wheelAngles (failure to move wheels = FAIL, not silent
+           pass), base Z resolved from opts/InitialBasePosition/
+           URDF geometry (no hard-coded guess), headless keyframes
+           only - no video claimed. MISS_HIT parse clean (static).
+           run_all wires csvPath/urdfPath/scenario/trajLog/v2.
+versions   COMPLETE. VERSION_MATRIX.txt (per-API releases,
+           MATLAB Online notes), old ROS 2 skeleton gated off; the actual optional
+           client is matlab/roslink (written, static review only, NOT RUN).
+
+ENGINEERING CHECKS (validation/TESTS.txt): T1 waypoint capture +
+footprint collision; T2 full-trajectory clearance; T3 global planner
+no-path FAIL vs diagnostic; T4 model inventory/geometry (gating);
+T5 open-loop kinematics (labeled kinematic self-consistency only -
+cannot prove URDF physics); T6 static/consistency checks (source-level: schema, frames, declared
+constants - NOT a simulated wall-contact metric).
+
+OPEN ITEMS FOR FIRST MATLAB EXECUTION
+1. Run `results = run_all;` from matlab/ on licensed MATLAB.
+2. The planner reports BLOCKED only as a true finding (never shrink
+   inflation to force a route). Python replication finds a 15.20 m
+   path at 0.6052 inflation on the shipped world, so a path is
+   expected; earlier "expected BLOCKED" notes are corrected.
+3. MATLAB Online: free/basic tier does NOT include the required
+   toolboxes; needs a license that covers them (e.g. college).
+4. matlab/roslink is optional, written, NOT RUN; needs ROS Toolbox, reachable DDS network and a running Gazebo; deceleration assumption unvalidated.
+5. Reaction module SE2 lattice: independent review open (optional module,
+   not gating; execution-time full-polygon filter is fail-closed per
+   step but not a swept inter-step proof).
+
+PROJECT WIRING FIXES APPLIED (no module author re-spin)
+- read_world_boxes: accept id|name header.
+- build_map/check_map: CSV input via read_world_boxes.
+- plan_path: LOS smoothing removed; default inflation 0.6052.
+- run_all: map origin auto-derived (was spawn); follow_route gets
+  scenario handle + maxSimTime 600; global vs follow planner status
+  separated; footprint v2 passed to demo; canonical URDF path.
+- reaction: default footprint v1 -> v2.
+- validation: T4 gating, strict schema, DIAGNOSTIC-PASS.
+- assets/mir100_footprint.csv: v1 -> v2.
+
+PROJECT AUDIT ROUND 3 (10 findings, all fixed)
+1. verify_robot: six URDF links lack <inertial>; import behavior for
+   their mass is UNPROVEN (no MATLAB here). Three decor links
+   (mirref_top_holes/front_ports/corner_caps) carry explicit inertial
+   mass now normalized out of the gate: gate checks the explicit-
+   inertial total 69.239016 kg vs 69.2390156 (tol 1e-3); decor mass is
+   recorded non-gating; report.massTotal = explicit + massImportNote
+   (import default NOT asserted as fact).
+2. follow_route: joint configuration is now zeros(1,numel(names)) -
+   row vector, matching DataFormat 'row'.
+3. validation T1 was always diagnostic (follow_route hardcoded true).
+   run_validation now plans first (build_map + plan_path), follows the
+   planned path when found (diagnosticOnly=false), and only labels the
+   run diagnostic when the planner returns empty.
+4. "EXPECTED BLOCKED" narrative removed everywhere. Real Python run of
+   build_map + plan_path on the shipped 65-box world at 0.6052
+   inflation: PATH FOUND, 15.20 m, 277 waypoints (independently
+   re-derived independently at 15.23 m). Planned path then followed with
+   the control Python pure-pursuit ref: 277/277 waypoints, final error
+   0.099 m, continuous polygon clearance lower bound +167.5 mm -
+   collision-free. The 1.125 m corridor claim was a synthetic probe,
+   not the actual world. Fail-closed branch kept for a true empty path.
+5. make_demo no longer re-runs the route when a trajLog is supplied:
+   regression assert isequal(trajLog, opts.trajLog); STANDALONE label
+   when self-running.
+6. renderScene3D's own robotPlatform now gets setup(scenario) after
+   creation (lifecycle was missing); stale caller-setup comment removed.
+7. Demo legend uses explicit artist handles [hWall hRoute hSpawn hGoal
+   trace foot head]; drawBox returns its handle; route drawn from
+   trajLog.waypoints when present.
+8. plan_path struct fallback now reads map.Grid/map.Resolution/
+   map.Origin (was lowercase fields incompatible with build_map).
+9. build_world StopTime 300 -> 600, aligned with follower maxSimTime.
+10. run_react_demo reads the canonical assets/hard_world_boxes.csv via
+    read_world_boxes (asserts existence); was a nonexistent path.
+
+INTEGRATION FIX ROUND 3b (3 critical review findings, fixed)
+MASS. load_mir100 now normalizes EVERY imported body whose source link
+   has no <inertial> to Mass = 0, discovered by parsing the URDF at
+   runtime - 7 links: base_footprint, imu_link, imu_frame, surface,
+   mirref_top_holes, mirref_front_ports, mirref_corner_caps (the round-3
+   fix subtracted only 3 decor links and hardcoded the expected total;
+   both removed). verify_robot now gates the ACTUAL imported tree mass
+   (post-normalization) against declaredSourceMass parsed from the URDF
+   at runtime (tol 1e-3), plus per-link body mass vs the same link's
+   source declaration (bare links expected exactly 0). Report gains
+   declaredSourceMass / importedMass; massTotal = actual imported mass;
+   the loader's raw pre-normalization total is recorded via importInfo
+   (evidence, not gated). MATLAB importrobot's default mass for
+   inertial-less links remains UNVERIFIED (no MATLAB here) - the
+   normalization is what makes it deterministic. The report schema was
+   revised for honest raw/source/normalized mass reporting: actual
+   imported mass gated against the runtime source parse, raw import
+   record kept as separate evidence.
+N1. run_validation called build_map(S.scen, opts.res, opts.originXY):
+   scenario handle unsupported AND opts.originXY never existed - would
+   have thrown and set every run-test NOTRUN. Both call sites (shared
+   run + test_t3) now call build_map(boxes-or-CSV, res, []) with auto
+   origin; test_t3 reuses the shared run's map/path when present. New
+   matlab/ref/callsite_regression.py statically scans every call site
+   of the contract functions (arity + banned patterns) - 33 call
+   sites, 0 violations; run before each push.
+N2. T1 graded the predeclared 16-waypoint v2 route while the follower
+   runs the 277-point global plan: 9/16 v2 waypoints lie > 0.15 m off
+   a valid plan (worst 0.658 m) - a perfect run would FALSE FAIL. T1
+   now grades COMMANDED-waypoint capture (trajLog.waypoints via
+   reachedIdx, min-distance fallback) + final goal <= 0.15 m + zero
+   collisions; the v2 route distance is diagnostic evidence only.
+   TESTS.txt spec updated BEFORE the first MATLAB run.

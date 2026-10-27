@@ -1,0 +1,131 @@
+MATLAB AMR PROJECT - VERSION / PRODUCT MATRIX (module: matlab/roslink)
+Verified live against official MathWorks documentation on 2026-10-27 (IST).
+Baseline target: MATLAB R2022a (per project brief; NOT a blanket support claim).
+"Introduced in" values are quoted from each function's official Version History
+section on the cited page. No MATLAB execution was performed (none available).
+FAIL-CLOSED RULE: anything not verified for R2022a below is treated as
+unavailable at baseline and must not be used without raising the baseline.
+
+SOURCE ENVIRONMENT CORRECTION (from parent, verified against live README
+2026-10-27): the repo github.com/muffedd/ROS_mir100 (commit 6450a77) is
+ROS 2 Jazzy + Gazebo Harmonic on Ubuntu 24.04, colcon build, packages
+mir_description + mir100_navigation, Nav2 stack (A* + regulated pure pursuit,
+SLAM Toolbox, robot_localization). It is NOT catkin/ROS 1. The earlier ROS 1
+(rosinit) skeleton was wrong-target and has been replaced.
+
+LEGEND
+  OK              = available at R2022a baseline
+  OK-MIN          = introduced in exactly R2022a (baseline is the MINIMUM release)
+  OPTIONAL        = only needed for an optional pattern, avoidable at baseline
+  NOT-IN-BASELINE = requires a newer release than R2022a (FAIL CLOSED)
+
+ 1. robotScenario ................ Robotics System Toolbox ...... R2022a ... OK-MIN
+    https://www.mathworks.com/help/robotics/ref/robotscenario.html
+ 2. robotPlatform ................ Robotics System Toolbox ...... R2022a ... OK-MIN
+    https://www.mathworks.com/help/robotics/ref/robotplatform.html
+    BaseTrajectory defaults to [] (verified on page). Platform motion WITHOUT
+    BaseTrajectory is supported at baseline via move(platform,"base",motion):
+ 2a. robotPlatform.move .......... Robotics System Toolbox ...... R2022a ... OK-MIN
+    https://www.mathworks.com/help/robotics/ref/robotplatform.move.html
+    -> Sensor Fusion and Tracking Toolbox is NOT required for platform motion;
+       it is only needed if the BaseTrajectory/waypointTrajectory pattern is
+       chosen. Drive platforms with move() to keep the dependency set minimal.
+ 3. rigidBodyTree ................ Robotics System Toolbox ...... R2016b ... OK
+    https://www.mathworks.com/help/robotics/ref/rigidbodytree.html
+ 4. binaryOccupancyMap ........... Navigation Toolbox ........... R2015a ... OK
+    https://www.mathworks.com/help/nav/ref/binaryoccupancymap.html
+    NOTE: per current official page (class lineage). Page also documents an
+    R2022a change to default map behavior during CODE GENERATION (fixed-size
+    maps); interactive/script use is unaffected.
+ 5. controllerPurePursuit ........ Robotics System Toolbox ...... R2019b ... OK*
+    https://www.mathworks.com/help/robotics/ref/controllerpurepursuit-system-object.html
+    *See F3 - output semantics changed in R2026a; version-branch required.
+ 6. differentialDriveKinematics .. Robotics System Toolbox ...... R2019b ... OK
+    https://www.mathworks.com/help/robotics/ref/differentialdrivekinematics.html
+ 7. mobileRobotPRM ............... Robotics System Toolbox ...... R2019b ... OK
+    https://www.mathworks.com/help/robotics/ref/mobilerobotprm.html
+    (Renamed from robotics.PRM in R2019b, per Version History.)
+ 8. plannerRRTStar ............... Navigation Toolbox ........... R2019b ... OK
+    https://www.mathworks.com/help/nav/ref/plannerrrtstar.html
+ 9. controllerTEB ................ Navigation Toolbox ........... R2023a ... NOT-IN-BASELINE
+    https://www.mathworks.com/help/nav/ref/controllerteb.html
+    *** FAIL CLOSED: controllerTEB does not exist at R2022a. See F1. ***
+10. robotLidarPointCloudGenerator Robotics System Toolbox ...... R2022a ... OK-MIN
+    https://www.mathworks.com/help/robotics/ref/robotlidarpointcloudgenerator-system-object.html
+11. checkCollision (rigidBodyTree) Robotics System Toolbox ..... R2020b ... OK
+    https://www.mathworks.com/help/robotics/ref/rigidbodytree.checkcollision.html
+    NOTE: R2022b changed default SELF-collision checking behavior. Pin the
+    expected release semantics if tests assert exact clearance verdicts.
+12. waypointTrajectory ........... Sensor Fusion and Tracking Toolbox ... R2018b ... OPTIONAL
+    https://www.mathworks.com/help/fusion/ref/waypointtrajectory-system-object.html
+    Canonical page is in the Sensor Fusion and Tracking Toolbox doc area; alias
+    pages also surface under the nav/robotics doc areas (search results show
+    both). Only needed if BaseTrajectory-based platform motion is used; avoid
+    by driving robotPlatform with move() (row 2a). If the project uses
+    waypointTrajectory anywhere else, SFT Toolbox returns to REQUIRED.
+13. VideoWriter .................. MATLAB (core) ................ R2010b ... OK
+    https://www.mathworks.com/help/matlab/ref/videowriter.html
+
+ROS 2 LINK MODULE (this skeleton; ROS Toolbox, ROS 2 interface - NOT ROS 1):
+14. ros2node ..................... ROS Toolbox .................. R2019b ... OK
+    https://www.mathworks.com/help/ros/ref/ros2node.html
+15. ros2publisher ................ ROS Toolbox .................. R2019b ... OK
+    https://www.mathworks.com/help/ros/ref/ros2publisher.html
+16. ros2subscriber ............... ROS Toolbox .................. R2019b ... OK
+    https://www.mathworks.com/help/ros/ref/ros2subscriber.html
+17. ros2message .................. ROS Toolbox .................. R2019b ... OK
+    https://www.mathworks.com/help/ros/ref/ros2message.html
+    ros2genmsg: NOT VERIFIED - omitted from the skeleton (repo uses standard
+    message types only). Verify its release requirement before any use.
+
+REQUIRED PRODUCTS AT R2022a BASELINE (integration contract as written):
+  - MATLAB                          (VideoWriter)
+  - Robotics System Toolbox         (robotScenario, robotPlatform + move,
+                                     rigidBodyTree, differentialDriveKinematics,
+                                     checkCollision, robotLidarPointCloudGenerator,
+                                     controllerPurePursuit, mobileRobotPRM)
+  - Navigation Toolbox              (binaryOccupancyMap, plannerRRTStar)
+  OPTIONAL:
+  - Sensor Fusion and Tracking Toolbox (ONLY if waypointTrajectory is used)
+  - ROS Toolbox                     (ONLY for this module's optional ROS 2 link)
+
+FLAGS
+  F1. controllerTEB requires R2023a+ and is NOT available at R2022a
+      (https://www.mathworks.com/help/nav/ref/controllerteb.html). Any contract
+      path depending on TEB (e.g. lidar_react opts) must fall back to
+      plannerRRTStar/mobileRobotPRM replanning + controllerPurePursuit tracking
+      (all R2022a-safe), or the baseline must be raised to R2023a+. FAIL CLOSED.
+  F2. robotScenario, robotPlatform (+move) and robotLidarPointCloudGenerator
+      are all introduced in exactly R2022a: R2022a is the minimum viable
+      release. State "R2022a minimum", not "any recent release".
+  F3. controllerPurePursuit output semantics changed in R2026a. Verbatim from
+      the official Version History
+      (https://www.mathworks.com/help/robotics/ref/controllerpurepursuit-system-object.html):
+        "R2026a: MaxAngularVelocity renamed to MaxCurvature - The
+         MaxAngularVelocity property is now called MaxCurvature."
+        "R2026a: angvel output argument renamed to curvature - The angvel
+         output argument is now called curvature."
+      CONSEQUENCE: on R2026a+ the second output is CURVATURE, NOT angular
+      velocity. Feeding it to a robot as angular velocity is wrong. For
+      R2022a target code: use MaxAngularVelocity and treat output 2 as
+      angular velocity. For R2026a+: omega = curvature * desiredLinearVelocity.
+      Any cross-release code must branch on version or convert explicitly.
+  F4. checkCollision self-collision defaults changed in R2022b (see row 11).
+  F5. ROS link target corrected to ROS 2 Jazzy + Gazebo Harmonic. The ROS 2
+      MATLAB APIs (rows 14-17) are OK at R2022a, so the optional link is
+      baseline-compatible - but it remains NOT BUILT/NOT EXECUTED (gated OFF).
+      ROS 1 (rosinit) guidance removed; ROS 1 does not apply to this repo.
+      The repo launcher pins ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST, so the
+      link expects MATLAB on the same host (README-verified).
+
+VERIFICATION METHOD / LIMITS
+  - All pages above fetched live 2026-10-27; "Introduced in" strings quoted
+    from each page's Version History. Canonical URLs for controllerPurePursuit,
+    mobileRobotPRM, waypointTrajectory and robotLidarPointCloudGenerator were
+    found via search after first-guess paths 404'd.
+  - Repo facts from the live README at https://github.com/muffedd/ROS_mir100
+    (fetched 2026-10-27): ROS 2 Jazzy, Gazebo Harmonic, Ubuntu 24.04, colcon
+    packages mir_description + mir100_navigation, Nav2 + SLAM Toolbox.
+  - No MATLAB or license available in this environment; matrix is doc-verified,
+    not execution-verified. ROS 2 topic names in the skeleton are defaults to
+    confirm live with `ros2 topic list`, not verified facts.

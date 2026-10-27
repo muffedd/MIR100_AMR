@@ -1,0 +1,80 @@
+MATLAB AMR PROJECT - INTEGRATION CONTRACT (project-level contract)
+Repo source: https://github.com/muffedd/ROS_mir100 (public, read-only
+clone; commit 6450a77). NO pushes. Local deliverables only.
+
+HARD FACTS (verified in prior validation work - reuse, do not re-derive):
+- Robot: MiR100 diff-drive. Wheel radius 0.0625 m, wheel separation
+  0.4452 m, total mass 69.239 kg as simulated.
+- FOOTPRINT POLYGON v2 (2026-10-27 MATLAB-build correction - caster
+  sweep was 5.24 mm outside v1): caster wheel collision = cylinder
+  r=0.0625, length=0.032 (verified in mir100_matlab.urdf), pivot at
+  (0.341346,+-0.203) / (-0.270154,+-0.203), swing offset 0.0382 ->
+  all-angle sweep radius ~0.102 around each pivot. v2 polygon (base
+  frame, 6 mm supported edge expansion), max radius 0.6052:
+  [[-0.474027,-0.236085],[-0.439393,-0.319793],[-0.355792,-0.354383],
+  [0.493050,-0.295637],[0.548024,0.236692],[0.513393,0.320393],
+  [0.429789,0.354984],[-0.417838,0.295634]]
+  v1 (Nav2-era, pods+chassis only, 0.5988) is SUPERSEDED for the
+  MATLAB build; the Gazebo/HARD_WORLD record stays as recorded -
+  this correction is NOT retro-applied there.
+- World: src/mir_description/worlds/hard_world.sdf, 65 wall boxes,
+  ground plane excluded (box >5x5 m), model poses yaw-only.
+- Route v2 waypoints, MAP frame (map origin = spawn (-4.31,-2.81)):
+  [[0,0],[0,1.12],[0,2.81],[0.56,3.09],[1.12,3.37],[1.12,4.5],
+  [1.12,5.62],[2.25,5.62],[3.37,5.62],[4.5,5.62],[5.25,5.25],
+  [5.25,4.12],[5.25,3.37],[6.75,3.37],[7.87,3.37],[8.62,3.37]]
+  WORLD frame = map + (-4.31,-2.81). Spawn world pose (-4.31,-2.81).
+  Final goal world (4.31,0.56). Route is WORLD-ORACLE guidance.
+
+MATLAB TARGET: R2022a baseline APIs only, unless an API's doc page
+says newer; module authors note each used function's "Introduced in" release
+in a comment. MATLAB execution has not been performed for this build: code is
+written + statically reviewed, NEVER claimed run or validated.
+Style: plain commented MATLAB .m files, no toolboxes beyond
+Robotics System Toolbox + Navigation Toolbox (except module 10/11 opts).
+
+DIRECTORY (single root per module author; no cross-module file edits):
+matlab/
+  assets/        module 1: flattened URDF + meshes/ + hard_world_boxes.csv
+  world/         module 2: build_world.m
+  map/           module 3: build_map.m + check_map.m
+  robot/         module 4: load_mir100.m + verify_robot.m
+  control/       module 5: follow_route.m
+  collision/     module 6: check_run_clearance.m
+  planning/      module 7: plan_path.m
+  reaction/      module 8: lidar_react.m
+  validation/    module 9: run_validation.m + TESTS.md
+  demo/          module 10: make_demo.m + REPORT_SKELETON.txt + README.txt
+  roslink/       module 11: ros_link.m (OPTIONAL module)
+
+FUNCTION SIGNATURES (fixed - code to these, not to each other):
+  boxes   = read_world_boxes(csv_path)  % Nx[xc,yc,zc,sx,sy,sz,yaw]
+  scen    = build_world(csv_path)                    % robotScenario
+  robot   = load_mir100(urdf_path)                   % rigidBodyTree
+  plat    = spawn_mir100(scen, robot)                % robotPlatform
+  map     = build_map(boxes|csv, resCELLS_PER_M, originXY)  % occupancyMap object
+% (RULING 05:05: map derives from the SAME SDF boxes, not the scenario
+% object; res is cells/metre (20 = 0.05 m cells). Map is the toolbox
+% OBJECT; the no-toolbox struct fallback is NOT part of the contract.)
+  ok      = check_map(map, boxes, resolution, originXY)  % T4 map part
+  report  = verify_robot(robot)      % struct of measured vs expected
+  trajLog = follow_route(plat, waypointsWorld, opts) % per-step log
+  clearLog= check_run_clearance(trajLog, boxes)      % T2 trace
+  path    = plan_path(map, startXY, goalXY, inflateM)
+  reactOut= lidar_react(plat, scen, path, opts)      % TEB local layer
+  results = run_validation()         % table T1..T6, PASS/FAIL rows
+
+CANONICAL SCHEMAS (locked 05:08 IST - exact field names, NO aliases):
+report = verify_robot(robot):
+  .linkCount .jointCount (double), .massTotal (kg), .wheelRadius (m),
+  .wheelSeparation (m), .footprintRadius (m, measured max collision-
+  primitive XY radius), .checks (struct array: name,value,expected,
+  tol,pass), .pass (logical overall). Validation reads ONLY these.
+trajLog = follow_route(plat, wpsWorld, opts):
+  .t .x .y .yaw (Nx1, sim-s/m/rad), .wheelAngles (Nx2 rad),
+  .waypoints (Mx2 world), .reachedIdx (integer vector),
+  .diagnosticOnly (logical), .plannerStatus (string),
+  .maxSimTime (from opts.maxSimTime, default 600)
+clearLog = check_run_clearance(trajLog, boxes):
+  .t (Nx1), .minDist (Nx1, per-step min polygon-to-wall distance),
+  .minOverall (scalar), .minAt (struct: x,y,t,box), .collision (logical)

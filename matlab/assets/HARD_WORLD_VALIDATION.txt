@@ -1,0 +1,130 @@
+================================================================
+HARD-WORLD RECORDED NAVIGATION VALIDATION - FINAL RESULT
+Date: 2026-10-26. Outcome: FAILED (both bounded trials).
+Navigation on the hard world is NOT validated and is NOT
+presented as a reliable demo. This file is the complete record;
+testing stopped after two trials, one with each route.
+================================================================
+
+WHAT WAS TESTED
+- Repo stack as committed, launched from the documented procedure,
+  no manual code edits. World: hard_world.sdf. Headless.
+- Config under test: the repo Nav2 params with robot_radius 0.53
+  replaced by a footprint polygon (8-vertex convex hull of the real
+  collision outline including the 45-degree-rotated laser pods;
+  enclosing radius 0.5988 m) in BOTH costmaps. inflation_radius
+  unchanged at the repo's actual value 0.70 (tuning, not geometry).
+- Guidance: WORLD-ORACLE waypoints (route file authored from known
+  world geometry). This is NOT autonomous exploration.
+- Pass/fail criteria were FIXED BEFORE the runs
+  (scripts/recorded_run/TEST_CRITERIA.md): C1 all 15 legs status 4
+  in order, C2 per-leg ground-truth (GT) arrival <= 0.35 m,
+  C3 final GT <= 0.50 m of the true goal, C4 swept-footprint
+  clearance > 0 vs all 65 wall boxes, C5 zero action-level aborts
+  and <= 3 BT costmap-clear recoveries. No retrofitted passes.
+
+EVIDENCE QUALITY / RUN HYGIENE (verified independently)
+- A first trial-2 attempt WEDGED before any motion: 12,405 TF
+  "jump back in time" warnings from leftover processes of trial 1,
+  16 recorded TF errors, zero goals sent, GT never left the spawn
+  pose. It is EXCLUDED as navigation evidence and kept only as
+  contamination evidence (scripts/recorded_run/attempt1_wedged/).
+- Trial 2 proper ran after a full restart. Verified from records:
+  zero TF jumpbacks, zero TF errors, monotonic clock, GT spawn
+  exactly (-4.310, -2.810), no motion before the driver's first
+  goal, route file sha256 matches the archived run metadata.
+
+TRIAL 1 (route v1) - FAIL
+- C1 FAIL: legs 1-3 status 4; leg 4 status 6 (aborted 3.4 sim-s
+  after the goal was sent; the robot never moved).
+- C2 legs 1-3 PASS (GT distance to target 0.286 / 0.033 / 0.224 m);
+  leg 4 FAIL (0.638 m).
+- C3 FAIL: final GT 7.715 m from the true goal (route abandoned).
+- C4 attempted-path PASS: recomputed on the full 55.6 Hz GT stream
+  (21,851 samples, swept hull of consecutive footprint poses vs all
+  65 wall boxes): minimum geometric margin 0.1448 m, zero samples in
+  the 0-0.05 m warn band. Meaning: the robot MODEL's trajectory kept
+  at least 14.5 cm of geometric margin to wall geometry. This is
+  geometric evidence from the physics engine's pose stream - the
+  world exposes no contact sensors, so it is not a contact log.
+- C5 FAIL: 6 BT costmap-clear recoveries (budget <= 3) and 1
+  action-level abort.
+- Observed mechanism: 115 "RegulatedPurePursuitController detected
+  collision ahead!" warnings and 7 "Controller patience exceeded"
+  follow_path aborts while GT margin stayed >= 14.5 cm - the
+  controller refused in its costmap belief; the >= 14.5 cm GT
+  geometric margin is the only contact-related evidence (no contact
+  sensors exist in this world).
+  The exact costmap cause is UNDETERMINED: cost values and local
+  costmap contents were not captured. Contributing-factor
+  hypotheses (unproven): route v1's diagonal legs are geometrically
+  tight (see audit below), inflation is 0.70, and SLAM map belief
+  drifted from GT by up to 0.385 m during motion.
+
+TRIAL 2 (route v2, corrected route) - FAIL
+- C1 FAIL: legs 1-4 status 4; leg 5 status 6.
+- C2 legs 1-4 PASS (GT 0.265 / 0.205 / 0.309 / 0.221 m); leg 5
+  FAIL (0.221 m from its target when the action aborted).
+- C3 FAIL: final GT 7.572 m from the true goal.
+- C4 attempted-path PASS on the full 55.6 Hz GT stream (15,122
+  samples): minimum geometric margin 0.0921 m, zero warn-band
+  samples. Same geometric-evidence caveat as trial 1.
+- C5 FAIL: 4 BT recoveries (> 3) and 1 action-level abort.
+- Observed: 72 "collision ahead" warnings; same refusal-with-margin
+  pattern; costmap cause equally UNDETERMINED. SLAM map-belief
+  drift from GT: up to 0.362 m.
+
+ROUTE GEOMETRY AUDIT (offline, polygon footprint, +-20 deg yaw
+sweep along every leg, exact distance vs all 65 wall boxes)
+- Route v1: 5 legs (3, 6, 7, 12, 13 - all diagonals) INTERSECT wall
+  geometry at some yaw in the sweep (0.000 m); leg 4 at 0.038 m.
+- Route v2 (shipped as route_waypoints.json): all 15 legs clear by
+  >= 0.085 m (worst: leg 11). v2 converted the tight diagonals to
+  L-turns; start, final goal, and the 15-goal denominator are
+  unchanged. Centerline audit screens geometry only - the recorded
+  swept-GT checks above are the trajectory evidence.
+
+WHAT THIS ESTABLISHES
+- Model characterization to date (docs/MODEL_VALIDATION.txt): mass
+  accounting and straight-line odometry match ground truth closely;
+  turn tests found the body UNDER-rotates vs wheels (147 deg on a
+  first turn, 164 deg steady-state, vs 175 deg at the wheels -
+  consistent with caster scrub, cause not proven). Single operating
+  points only; the model is partially characterized, not blanket
+  validated.
+- On both trials the first legs were physically reached (GT
+  confirmed), and no trajectory came closer than 9.2 cm to any wall
+  geometry. Contact sensors do not exist in this world, so absence
+  of contact is supported only by this geometric margin evidence.
+- Hard-world guided navigation is NOT validated: neither trial
+  completed the route, recovery budgets were exceeded, and the
+  controller's refusal cause is undetermined without costmap
+  records. Map-belief success is not physical arrival: SLAM belief
+  drifted 0.34-0.39 m from ground truth once the robot moved.
+
+REMAINING LIMITS
+- No contact-sensor data exists in this world (recorded in-band);
+  clearance evidence is geometric only.
+- "Why the controller refused" needs costmap cost captures that
+  were not recorded; do not claim inflation/geometry as the proven
+  cause.
+- Waypoints are world-oracle guidance; unexplored-map autonomy is
+  not claimed. Swept clearance is sampled at 55.6 Hz with <= 0.42
+  deg yaw steps (rotation-arc residual ~0.02 mm), not a continuous
+  mathematical proof.
+- Testing was stopped after two trials, one with each route
+  (2026-10-26); both failures are preserved as the final state of
+  this work.
+
+EVIDENCE MANIFEST (scripts/recorded_run/)
+- TEST_CRITERIA.md: pre-registered criteria (fixed before the runs)
+- nav_driver5.py, run_recorder5.py, check_clearance.py: tooling
+- nav2_params_recorded_footprint.yaml: params under test
+- route_waypoints.json: corrected route (v2, sha256 65175678...)
+- route_waypoints_v1.json: original route that failed trial 1
+- run_stack.sh / stop_stack.sh: pre-flight-checked, process-group
+  scoped start/stop with a PID manifest and ownership verification.
+  They never kill other ROS sessions or touch shared DDS state.
+- trial1/ trial2/ attempt1_wedged/: driver.jsonl, stack.log,
+  clearance_summary.json (trials 1-2), run_meta.json (trial 2),
+  gzipped full recorder streams (TF 10 Hz, odom, clock, GT 55.6 Hz)
