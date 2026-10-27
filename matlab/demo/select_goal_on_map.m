@@ -26,7 +26,7 @@ goalHandle = plot(ax,defaultGoal(1),defaultGoal(2),'r^','MarkerFaceColor',[0.9 0
     'MarkerSize',9,'DisplayName','Default goal');
 allX = [boxes(:,1);startXY(1);defaultGoal(1)];
 allY = [boxes(:,2);startXY(2);defaultGoal(2)];
-pad = max(1,0.06*max(range(allX),range(allY)));
+pad = max(1,0.06*max(max(allX)-min(allX),max(allY)-min(allY)));
 xlim(ax,[min(allX)-pad,max(allX)+pad]);
 ylim(ax,[min(allY)-pad,max(allY)+pad]);
 axis(ax,'equal'); grid(ax,'on'); box(ax,'on');
