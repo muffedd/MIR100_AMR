@@ -230,7 +230,7 @@ manifest.topdownVideo = vf2;
 manifest.keyframes2D  = {};
 
 stride = max(1, round(opts.frameStride));
-for k = 1:stride:nS
+for k = unique([1:stride:nS, nS, opts.keyframeIdx(:).'])
     R  = [cos(th(k)) -sin(th(k)); sin(th(k)) cos(th(k))];
     fp = (R * opts.footprint.').' + [x(k) y(k)];
     set(foot, 'XData', fp(:,1), 'YData', fp(:,2));
@@ -246,9 +246,9 @@ for k = 1:stride:nS
     end
     drawnow;
     if canVideo, writeVideo(vw2, getframe(fig)); end
-    if opts.saveKeyframes && (k == 1 || mod(k, opts.keyframeEvery) == 0 || k + stride > nS)
+    if opts.saveKeyframes && isKeyframe(k, stride, nS, opts)
         png = sprintf('keyframe2d_%05d.png', k);
-        print(fig, fullfile(outDir, png), '-dpng', '-r120');
+        print(fig, fullfile(outDir, png), '-dpng', sprintf('-r%d', opts.keyframeRes));
         manifest.keyframes2D{end+1} = png;
     end
 end
@@ -398,6 +398,8 @@ d = struct( ...
     'frameStride',    [], ...
     'saveKeyframes',  true, ...
     'keyframeEvery',  30, ...
+    'keyframeIdx',    [], ...     % explicit sample indices; replaces keyframeEvery
+    'keyframeRes',    120, ...    % PNG dpi
     'videoProfile',   'Uncompressed AVI', ...
     'dt',             0.01, ...   % matches world UpdateRate=100
     'maxLinVel',      0.9, ...
@@ -539,7 +541,7 @@ try
     nS = numel(t);
     stride = max(1, round(opts.frameStride));
     playbackTimer = tic;
-    for k = unique([1:stride:nS, nS])
+    for k = unique([1:stride:nS, nS, opts.keyframeIdx(:).'])
         if ~isgraphics(ax3), break; end % Closing the view stops playback.
         qw = cos(th(k)/2); qz = sin(th(k)/2);
         motion = [x(k) y(k) baseZ, zeros(1,3), zeros(1,3), ...
@@ -580,9 +582,9 @@ try
             pause(max(0,t(k)-t(1)-toc(playbackTimer)));
         end
         if canVideo, writeVideo(vw3, getframe(fig3)); end
-        if opts.saveKeyframes && (k == 1 || mod(k, opts.keyframeEvery) == 0 || k + stride > nS)
+        if opts.saveKeyframes && isKeyframe(k, stride, nS, opts)
             png = sprintf('keyframe3d_%05d.png', k);
-            print(fig3, fullfile(outDir, png), '-dpng', '-r120');
+            print(fig3, fullfile(outDir, png), '-dpng', sprintf('-r%d', opts.keyframeRes));
             keyframes{end+1} = png;
         end
     end
@@ -643,6 +645,8 @@ for i = 1:numel(candidates)
     tried{end+1} = prof;
     if any(strcmp(prof, {'Archival', 'Motion JPEG 2000'}))
         videoFile = fullfile(outDir, [baseName '.mj2']);
+    elseif strcmp(prof, 'MPEG-4')   % opt-in, lossy; for slides (Windows/macOS)
+        videoFile = fullfile(outDir, [baseName '.mp4']);
     else
         videoFile = fullfile(outDir, [baseName '.avi']);
     end
@@ -685,6 +689,15 @@ try
 catch ME
     warning('make_demo:robotView', ...
         'Robot 3D still views failed (mesh resolution?): %s', ME.message);
+end
+end
+
+function tf = isKeyframe(k, stride, nS, opts)
+% Explicit opts.keyframeIdx wins; otherwise every keyframeEvery samples.
+if ~isempty(opts.keyframeIdx)
+    tf = ismember(k, opts.keyframeIdx);
+else
+    tf = k == 1 || mod(k, opts.keyframeEvery) == 0 || k + stride > nS;
 end
 end
 

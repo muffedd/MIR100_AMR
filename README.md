@@ -45,6 +45,19 @@ follows the robot, and the requested goal. Walls are drawn 0.6 m tall in this
 still use the full walls. It is a
 replay of the freshly computed trajectory. Batch runs stay hidden.
 
+For presentation slides, run once from `matlab/`:
+
+```matlab
+pptDir = make_ppt_figures;            % standard goal [4.31 0.56]
+pptDir = make_ppt_figures([-4.31 -1.69]);  % or your own goal
+```
+
+It does one real run and writes numbered PNGs (200 dpi) to `<run folder>/ppt/`.
+They cover the robot model, the occupancy map with the A* path, six 3D and
+six 2D frames of the robot moving, the route overview, the graphs (errors,
+error calibration, speed, heading, clearance), a results table and the T1-T6
+table. It also writes an MP4 of the 3D motion (Windows/macOS MATLAB).
+
 To set a goal directly without a dialog:
 
 ```matlab
