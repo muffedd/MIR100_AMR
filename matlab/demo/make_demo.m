@@ -31,14 +31,16 @@ function manifest = make_demo(csvPath, urdfPath, outDir, opts)
 %   supplies it). make_demo ERRORS when no explicit asset is given; it
 %   never picks an arbitrary file.
 %
-%   STATUS: authored, statically reviewed, MISS_HIT-linted; NOT yet
-%   executed in MATLAB (no MATLAB runtime available to this module author).
+%   STATUS: executed in MATLAB R2025b (see DEBUG_REPORT.md). The 3D-view
+%   wall height, overlay, keyframeIdx/keyframeRes and MPEG-4 changes were
+%   added afterwards and are MISS_HIT-linted, not yet re-run in MATLAB.
 %   See README.txt. Headless runs produce NO video - keyframe PNGs only,
 %   stated bluntly in the manifest.
 %
 %   Verified against MathWorks docs (2026-10-27, URLs in README.txt):
 %     VideoWriter 'Uncompressed AVI' = uncompressed RGB24 (lossless);
-%     'Archival' = lossless Motion JPEG 2000. MPEG-4 not on Linux: unused.
+%     'Archival' = lossless Motion JPEG 2000. MPEG-4 (lossy, not on
+%     Linux) only when opts.videoProfile asks for it, e.g. for slides.
 %     importrobot: URDF/Xacro/SDF -> rigidBodyTree (Robotics System Toolbox).
 %     robotScenario/robotPlatform/addMesh/show3D/move (R2022a+):
 %       addMesh(scenario,"Box",Size=[sx sy sz],Position=[xc yc zc],Color=..)

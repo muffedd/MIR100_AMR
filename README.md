@@ -58,6 +58,8 @@ six 2D frames of the robot moving, the route overview, the graphs (errors,
 error calibration, speed, heading, clearance), a results table and the T1-T6
 table. It also writes an MP4 of the 3D motion (Windows/macOS MATLAB).
 
+Slide-by-slide plan and viva answers: [docs/PRESENTATION_GUIDE.md](docs/PRESENTATION_GUIDE.md).
+
 To set a goal directly without a dialog:
 
 ```matlab
