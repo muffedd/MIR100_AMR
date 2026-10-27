@@ -39,8 +39,27 @@ results = run_all;
 
 In the MATLAB desktop this asks for your goal X/Y in world metres, computes a
 fresh path, and opens the original robot/world in 3D with wheel animation.
-The view shows the commanded path, executed trace and requested goal. It is a
+The view shows the commanded path, executed trace, a footprint outline that
+follows the robot, and the requested goal. Walls are drawn 0.6 m tall in this
+3D view only (real 2.2 m walls hid the robot); planning and collision checks
+still use the full walls. It is a
 replay of the freshly computed trajectory. Batch runs stay hidden.
+
+For presentation slides, run once from `matlab/`:
+
+```matlab
+pptDir = make_ppt_figures;            % standard goal [4.31 0.56]
+pptDir = make_ppt_figures([-4.31 -1.69]);  % or your own goal
+```
+
+It does one real run and writes numbered PNGs (200 dpi) to `<run folder>/ppt/`.
+They cover the robot model, the occupancy map with the A* path, six 3D and
+six 2D frames of the robot moving, the route overview, the graphs (errors,
+error calibration, speed, heading, clearance), a results table and the T1-T6
+table. It also writes an MP4 of the 3D motion (Windows/macOS MATLAB).
+
+Slide-by-slide plan and viva answers: [docs/PRESENTATION_GUIDE.md](docs/PRESENTATION_GUIDE.md).
+New to MATLAB/robotics? Start with [docs/LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md): plain-words explanation of every stage, the maths, a viva question bank, and a runnable experiment (`docs/learning/lookahead_experiment.py`).
 
 To set a goal directly without a dialog:
 
