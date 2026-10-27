@@ -8,7 +8,8 @@ function results = run_all(rootDir, opts)
 %   function's variables).
 %
 %   run_all([x y]) selects a goal in world metres and computes a fresh path.
-%   run_all opens a goal dialog in desktop MATLAB; batch uses [4.31 0.56].
+%   In desktop MATLAB, run_all opens a map and lets you click a goal;
+%   batch uses [4.31 0.56].
 %   run_all(rootDir,opts): opts.goal, showAnimation, renderDemo.
 %
 %   Executed on MATLAB R2025b. See DEBUG_REPORT.md in the project root
@@ -29,14 +30,9 @@ if nargin < 1 || isempty(rootDir), rootDir = fileparts(mfilename('fullpath')); e
 validateattributes(opts,{'struct'},{'scalar'});
 if ~isfield(opts,'showAnimation'),opts.showAnimation=~batchStartupOptionUsed;end
 if ~isfield(opts,'renderDemo'),opts.renderDemo=true;end
-if ~isfield(opts,'goal') || isempty(opts.goal)
+goalNeedsGui = ~isfield(opts,'goal') || isempty(opts.goal);
+if goalNeedsGui
     opts.goal=[4.31 .56];
-    if ~batchStartupOptionUsed
-        answer=inputdlg({'Goal X (world metres):','Goal Y (world metres):'}, ...
-            'MiR100 destination',[1 40],{'4.31','0.56'});
-        if isempty(answer),error('run_all:cancelled','Goal selection cancelled. No motion commanded.');end
-        opts.goal=[str2double(answer{1}),str2double(answer{2})];
-    end
 end
 validateattributes(opts.goal,{'numeric'},{'real','finite','vector','numel',2});
 opts.goal=double(opts.goal(:)');
@@ -51,6 +47,10 @@ urdfPath = fullfile(rootDir, 'assets', 'mir_description', 'urdf', 'mir100_matlab
 RES     = 0.05;              % occupancy map cell size, METRES PER CELL
 SPAWN   = [-4.31, -2.81];    % world-frame spawn (route v2 start)
 GOAL    = opts.goal;         % requested world-frame destination
+if goalNeedsGui && ~batchStartupOptionUsed
+    GOAL = select_goal_on_map(csvPath, SPAWN, GOAL);
+    opts.goal = GOAL;
+end
 INFLATE = 0.6052;            % planner inflation = footprint polygon v2 radius
                              % (caster-sweep-corrected; do NOT shrink)
 % Footprint polygon v2 (base frame), caster-sweep corrected, max radius
