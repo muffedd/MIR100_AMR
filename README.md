@@ -59,6 +59,7 @@ error calibration, speed, heading, clearance), a results table and the T1-T6
 table. It also writes an MP4 of the 3D motion (Windows/macOS MATLAB).
 
 Slide-by-slide plan and viva answers: [docs/PRESENTATION_GUIDE.md](docs/PRESENTATION_GUIDE.md).
+New to MATLAB/robotics? Start with [docs/LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md): plain-words explanation of every stage, the maths, a viva question bank, and a runnable experiment (`docs/learning/lookahead_experiment.py`).
 
 To set a goal directly without a dialog:
 
