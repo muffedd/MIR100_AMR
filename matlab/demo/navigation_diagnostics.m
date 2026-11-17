@@ -30,7 +30,7 @@ data=table(t,xy(:,1),xy(:,2),yaw,speed,omega,goalError,tracking,clearance.minDis
     'VariableNames',{'time_s','x_m','y_m','yaw_rad','speed_m_s','yaw_rate_rad_s', ...
     'distance_to_goal_m','cross_track_error_m','footprint_clearance_m'});
 writetable(data,fullfile(outDir,'navigation_metrics.csv'));
-visibility='off';if visible,visibility='on';end
+visibility='off';   % graphs are saved to disk; the 3D replay is the live view
 fig=figure('Name','MiR100 navigation graphs','NumberTitle','off', ...
     'Visible',visibility,'Color','w','Position',[40 40 1350 850]);
 layout=tiledlayout(fig,3,2,'TileSpacing','compact','Padding','compact');
@@ -72,5 +72,5 @@ set(findall(fig,'Type','axes'),'Color','w','XColor','k','YColor','k','GridColor'
 set(findall(fig,'Type','text'),'Color','k');
 set(findall(fig,'Type','legend'),'Color','w','TextColor','k','EdgeColor',[.3 .3 .3]);
 exportgraphics(fig,fullfile(outDir,'navigation_graphs.png'),'Resolution',140);
-if ~visible,close(fig);end
+close(fig);   % saved above; leaving it open made it the target of later plots
 end

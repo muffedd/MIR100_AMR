@@ -48,7 +48,7 @@ RES     = 0.05;              % occupancy map cell size, METRES PER CELL
 SPAWN   = [-4.31, -2.81];    % world-frame spawn (route v2 start)
 GOAL    = opts.goal;         % requested world-frame destination
 if goalNeedsGui && ~batchStartupOptionUsed
-    GOAL = select_goal_on_map(csvPath, SPAWN, GOAL);
+    GOAL = select_goal_on_map(csvPath, SPAWN, GOAL, 0.6052);
     opts.goal = GOAL;
 end
 INFLATE = 0.6052;            % planner inflation = footprint polygon v2 radius
@@ -84,6 +84,15 @@ step('check_map');         assert(check_map(map, boxes, RES, []), ...
 % Full-world bounds are covered by check_map's wall probes (every wall
 % must be inside and occupied), not only start/goal.
 step('plan_path');         [path, planInfo] = plan_path(map, SPAWN, GOAL, INFLATE);
+% Interactive pick: a blocked goal asks for another click instead of
+% ending the run with nothing to show. Batch/explicit goals stay as given.
+while isempty(path) && goalNeedsGui && ~batchStartupOptionUsed
+    fprintf('Goal [%.3f %.3f] blocked (%s). Pick another goal.\n',GOAL,planInfo.reason);
+    GOAL = select_goal_on_map(csvPath, SPAWN, GOAL, INFLATE, ...
+        sprintf('Previous goal blocked: %s',planInfo.reason));
+    opts.goal = GOAL;
+    [path, planInfo] = plan_path(map, SPAWN, GOAL, INFLATE);
+end
 % GLOBAL planner status is tracked separately from the follower's own
 % plannerStatus field (which only reports follow success/timeout):
 if isempty(path)
@@ -155,11 +164,38 @@ results.planInfo=planInfo;results.outputDir=outDir;
 results.validationScope='T1-T6 independently validate the canonical reference goal [4.31 0.56].';
 results.metrics=metrics;results.algorithms=algorithms;
 save(fullfile(outDir,'navigation_results.mat'),'results');
+write_review_summary(results);
 fprintf('Requested goal: [%.3f %.3f], stop=%s, error=%.4f m\n',GOAL,trajLog.status,trajLog.finalError);
 fprintf('%s\nGraphs and numeric logs: %s\n',results.validationScope,outDir);
 
 fprintf('RUN_ALL complete. corePass=%d validationPass=%d (kinematic simulation only).\n',corePass,results.pass);
 disp(struct2table(rv,'AsArray',true));
+if opts.showAnimation
+    showResultsPage(outDir, results, rv);
+end
+end
+
+function showResultsPage(outDir, results, rv)
+% Results page, opened LAST: the graphs figure is built hidden earlier so
+% it never becomes the target of the 3D scene; here its saved image is
+% shown together with the run and validation verdicts.
+png = fullfile(outDir, 'navigation_graphs.png');
+if ~isfile(png), return; end
+fig = figure('Name', 'MiR100 navigation results', 'NumberTitle', 'off', ...
+    'Color', 'w', 'Position', [40 40 1350 900]);
+ax = axes('Parent', fig, 'Position', [0 0 1 0.9]);
+image(ax, imread(png)); axis(ax, 'image', 'off');
+gate = rv(ismember({rv.id}, {'T1','T2','T3','T4','T5','T6'}));
+tests = strjoin(cellfun(@(id, s) sprintf('%s %s', id, s), {gate.id}, {gate.status}, ...
+    'UniformOutput', false), '   ');
+if results.pass, verdict = 'PASS'; else, verdict = 'FAIL'; end
+annotation(fig, 'textbox', [0 0.9 1 0.1], 'EdgeColor', 'none', ...
+    'HorizontalAlignment', 'center', 'FontSize', 12, 'Interpreter', 'none', ...
+    'Color', 'k', 'BackgroundColor', 'w', ...
+    'String', {sprintf('Overall: %s   |   Goal [%.2f %.2f] m   |   Stop: %s   |   Goal error %.3f m', ...
+        verdict, results.goal, results.trajectory.status, results.trajectory.finalError), ...
+        ['Validation (reference goal): ' tests], ...
+        ['Saved in: ' outDir]});
 end
 
 function step(name)

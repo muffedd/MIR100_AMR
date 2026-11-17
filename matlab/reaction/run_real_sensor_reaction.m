@@ -48,11 +48,26 @@ map   = build_map(boxes, 20, []);                        % cells/m, auto origin
 if ~pinfo.ok || isempty(path), error('run_real_sensor_reaction:noPath','global plan failed: %s', pinfo.reason); end
 setup(scen);                                             % required before read/advance
 ro = opts; % Honor caller time limits and control options.
+if isfield(opts,'showLive') && opts.showLive
+    fig=figure('Name','MiR100 live sensor replanning','NumberTitle','off','Color','w');
+    ro.liveAxes=axes('Parent',fig);
+    show3D(scen,Parent=ro.liveAxes);
+    axis(ro.liveAxes,'equal'); view(ro.liveAxes,[-40 35]);
+    xlim(ro.liveAxes,[-6.6 6.6]); ylim(ro.liveAxes,[-5.1 5.1]); zlim(ro.liveAxes,[0 2.4]);
+    hold(ro.liveAxes,'on');
+    subtitle(ro.liveAxes,'Red: sensor-detected cells | Dashed: current plan | Wheels not animated');
+    drawnow;
+end
 ro.boxes = boxes; ro.unseenBoxes = ub; ro.movePlatform = true;
 ro.lidarMode = 'robotSensor'; ro.robotLidar = h; ro.lidarRange = 8;
 ro.startPose = [-4.31 -2.81 0];
 out = lidar_react(plat, scen, path, ro);
 out.globalPathInfo = pinfo;
+if isfield(ro,'liveAxes') && isgraphics(ro.liveAxes)
+    title(ro.liveAxes,sprintf('Stop: %s | goal error=%.3f m | collision=%d | replans=%d', ...
+        out.stopReason,out.goalError,out.collided,out.replanCount));
+    drawnow;
+end
 fprintf('real-sensor reaction: success=%d collided=%d replans=%d sensorUpdates=%d simTime=%.1f\n', ...
     out.success, out.collided, out.replanCount, out.robotSensorUpdates, out.simTime);
 cellfun(@disp, out.notes);

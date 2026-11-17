@@ -37,7 +37,19 @@ To run in MATLAB, cd to `matlab/`, then:
 results = run_all;
 ```
 
-In the MATLAB desktop this asks for your goal X/Y in world metres, computes a
+For a review-friendly control window instead, run `mission_control`. It can
+start a new mission, load a saved run, replay its 3D trajectory, open its
+graphs and compare two saved runs. Its measurements come from the selected runs.
+
+The **Sensor replan** button (or `replanning_demo`) runs a separate MATLAB
+`robotSensor` simulation with an obstacle absent from the planner's original
+map. The live 3D view displays detected cells, the current plan, sensor scan
+count and replan count. The result reports its actual stop reason; a blocked
+route can safely stop without reaching the goal. This sensor is a three-channel
+approximation and the simulation is kinematic. Wheel angles are not logged by
+this module, so wheels do not animate in this view. A full run may take minutes.
+
+In the MATLAB desktop this opens a map to click your goal in world metres, computes a
 fresh path, and opens the original robot/world in 3D with wheel animation.
 The view shows the commanded path, executed trace and requested goal. It is a
 replay of the freshly computed trajectory. Batch runs stay hidden.
@@ -56,6 +68,11 @@ speed, heading, and full-footprint clearance. Numeric data is in
 Previous outputs are reports only; the runner never loads them to plan a path.
 An identical goal produces the same deterministic A* route. A blocked goal
 commands no motion and reports the reason without substituting another route.
+
+To watch only the 3D navigation from a saved run, use `show_navigation_3d` and
+choose that run's `navigation_results.mat`. If the results are already in your
+workspace, use `show_navigation_3d(results)`. This replays the actual saved
+poses and wheel angles without running the validation battery or making a video.
 
 Core algorithms: known static walls -> occupancy grid -> 0.6052 m inflation ->
 8-connected A* -> pure-pursuit steering -> differential-drive kinematics. The

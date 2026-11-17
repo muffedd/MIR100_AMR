@@ -105,6 +105,10 @@ fprintf('make_demo: reading world boxes from %s\n', csvPath);
 boxes = read_world_boxes(csvPath);
 assert(isnumeric(boxes) && size(boxes, 2) == 7, ...
     'make_demo:badBoxes', 'read_world_boxes must return Nx7 [xc yc zc sx sy sz yaw].');
+if ~isempty(opts.extraBoxes)
+    validateattributes(opts.extraBoxes,{'numeric'},{'2d','ncols',7,'finite','real'});
+    boxes = [boxes; opts.extraBoxes];
+end
 manifest.nBoxes = size(boxes, 1);
 
 scen  = build_world(csvPath);
@@ -175,11 +179,20 @@ manifest.collision    = collided;
 manifest.baseZ       = baseZ;
 manifest.baseZSource = baseZSource;
 
-canVideo = usejava('desktop');
+canVideo = opts.recordVideo && usejava('desktop');
 % The newer desktop can display figures without a Java desktop.
 manifest.showAnimation = opts.showAnimation;
 figVis = 'on';
 if ~opts.showAnimation, figVis = 'off'; end
+if opts.sceneOnly
+    [manifest.sceneVideo, manifest.keyframes3D, notes, ...
+        manifest.sceneProfile, manifest.wheelAnim] = renderScene3D( ...
+        boxes, robot, trajLog, t, x, y, th, outDir, opts, ...
+        canVideo, figVis, minClear, collided, baseZ);
+    manifest.notes = [manifest.notes, notes];
+    manifest.captureMode = '3D trajectory replay';
+    return;
+end
 if canVideo
     manifest.captureMode = 'lossless video + PNG keyframes';
 else
@@ -192,8 +205,19 @@ else
     manifest.notes{end+1} = manifest.captureMode;
 end
 
+% ---------------- 3D scene: actual robot meshes inside actual world ------
+% Played FIRST so the live 3D navigation is what the user sees; the 2D
+% top-down animation follows as a secondary view.
+[vf3, kf3, note3, prof3, wheelForm] = renderScene3D(boxes, robot, trajLog, ...
+    t, x, y, th, outDir, opts, canVideo, figVis, minClear, collided, baseZ);
+manifest.sceneVideo   = vf3;
+manifest.sceneProfile = prof3;
+manifest.keyframes3D  = kf3;
+manifest.wheelAnim    = wheelForm;
+manifest.notes        = [manifest.notes, note3];
+
 % ---------------- top-down 2D animation ----------------------------------
-fig = figure('Visible', figVis, 'Color', 'w', 'Position', [50 50 1100 820]);
+fig = figure('Visible', 'off', 'Color', 'w', 'Position', [50 50 1100 820]);  % 2D is secondary: saved, not shown
 ax  = axes('Parent', fig); hold(ax, 'on'); axis(ax, 'equal');
 pad = 1.0;
 xlim(ax, [min(boxes(:,1)) - pad, max(boxes(:,1)) + pad]);
@@ -263,18 +287,10 @@ print(fig, fullfile(outDir, 'trajectory_overview.png'), '-dpng', '-r150');
 manifest.overviewPng = 'trajectory_overview.png';
 close(fig);
 
-% ---------------- 3D scene: actual robot meshes inside actual world ------
-[vf3, kf3, note3, prof3, wheelForm] = renderScene3D(boxes, robot, trajLog, ...
-    t, x, y, th, outDir, opts, canVideo, figVis, minClear, collided, baseZ);
-manifest.sceneVideo   = vf3;
-manifest.sceneProfile = prof3;
-manifest.keyframes3D  = kf3;
-manifest.wheelAnim    = wheelForm;
-manifest.notes        = [manifest.notes, note3];
 manifest.videoProfile = prof2;
 
 % ---------------- imported-robot proof stills -----------------------------
-manifest.robotPngs = renderRobotViews(robot, outDir, figVis);
+manifest.robotPngs = renderRobotViews(robot, outDir, 'off');
 
 % ---------------- manifest -----------------------------------------------
 tb = ver;
@@ -389,6 +405,12 @@ end
 
 function opts = withDefaults(opts)
 d = struct( ...
+    'sceneOnly',      false, ...
+    'recordVideo',    true, ...
+    'goalWorld',      [], ...
+    'extraBoxes',     zeros(0,7), ...
+    'sceneSubtitle',  '', ...
+    'followCamera',   true, ...   % 3D camera chases the robot during playback
     'showAnimation',  ~batchStartupOptionUsed, ...
     'fps',            15, ...
     'frameStride',    [], ...
@@ -468,13 +490,15 @@ try
         Color = [0.88 0.88 0.88], Position = [0 0 -0.02]);
     for i = 1:size(boxes, 1)
         b = boxes(i, :);
+        colour = [0.55 0.57 0.62];
+        if i > size(boxes,1)-size(opts.extraBoxes,1), colour = [0.9 0.2 0.2]; end
         if abs(b(7)) < 1e-9
             addMesh(scenario, "Box", Size = [b(4) b(5) b(6)], ...
-                Position = [b(1) b(2) b(3)], Color = [0.55 0.57 0.62]);
+                Position = [b(1) b(2) b(3)], Color = colour);
         else
             [V, F] = yawBoxMesh(b);
             addMesh(scenario, "Custom", Vertices = V, Faces = F, ...
-                Color = [0.55 0.57 0.62]);
+                Color = colour);
         end
     end
     platform = robotPlatform("mir100", scenario, ...
@@ -498,9 +522,13 @@ try
         notes{end+1} = 'trajLog.wheelAngles missing/invalid: wheel animation off.';
     end
 
-    ax3 = show3D(scenario);
-    fig3 = ancestor(ax3, 'figure');
-    set(fig3, 'Visible', figVis, 'Color', 'w', 'Position', [70 70 1100 820]);
+    % Own figure + axes: a bare show3D(scenario) draws into the CURRENT
+    % figure (e.g. the navigation-graphs page), hiding the robot there.
+    fig3 = figure('Name', 'MiR100 live 3D navigation', 'NumberTitle', 'off', ...
+        'Visible', figVis, 'Color', 'w', 'Position', [70 70 1100 820]);
+    ax3 = axes('Parent', fig3);
+    show3D(scenario, Parent = ax3);
+    legend(ax3, 'off');
     axis(ax3, 'equal');
     xlim(ax3, [-6.6 6.6]); ylim(ax3, [-5.1 5.1]); zlim(ax3, [0 2.4]);
     view(ax3, [-40 24]);
@@ -508,10 +536,20 @@ try
     hold(ax3,'on');
     route=opts.wpsWorld;
     if isfield(trajLog,'waypoints') && ~isempty(trajLog.waypoints),route=trajLog.waypoints;end
-    plot3(ax3,route(:,1),route(:,2),.025*ones(size(route,1),1),'k--','LineWidth',1.3,'Tag','NavigationPlan');
-    plot3(ax3,route(end,1),route(end,2),.04,'rp','MarkerFaceColor','r','MarkerSize',12,'Tag','NavigationGoal');
+    if ~isempty(route)
+        plot3(ax3,route(:,1),route(:,2),.025*ones(size(route,1),1),'k--','LineWidth',1.3,'Tag','NavigationPlan');
+    end
+    goal = opts.goalWorld;
+    if isempty(goal) && ~isempty(route), goal = route(end,:); end
+    if ~isempty(goal)
+        plot3(ax3,goal(1),goal(2),.04,'rp','MarkerFaceColor','r','MarkerSize',12,'Tag','NavigationGoal');
+    end
     executedTrace=plot3(ax3,x(1),y(1),.03,'b-','LineWidth',1.8,'Tag','NavigationTrace');
-    subtitle(ax3,'Dashed: commanded path | Blue: executed motion | Red: requested goal');
+    state = '';
+    if isfield(trajLog,'status'), state = [' | Stop: ' char(trajLog.status)]; end
+    caption = opts.sceneSubtitle;
+    if isempty(caption), caption = 'Dashed: commanded path | Blue: executed motion | Red: requested goal'; end
+    subtitle(ax3,[caption state]);
 
     [vw3, videoFile, profileUsed] = openLosslessWriter(outDir, ...
         'mir100_demo_3d', opts, canVideo);
@@ -519,6 +557,12 @@ try
     nS = numel(t);
     stride = max(1, round(opts.frameStride));
     playbackTimer = tic;
+    camYaw = th(1);
+    if opts.followCamera
+        % Live navigation view: fixed-limit "whole world" framing would
+        % shrink the robot, so let the camera frame the chase view instead.
+        axis(ax3, 'vis3d'); camproj(ax3, 'perspective');
+    end
     for k = unique([1:stride:nS, nS])
         if ~isgraphics(ax3), break; end % Closing the view stops playback.
         qw = cos(th(k)/2); qz = sin(th(k)/2);
@@ -540,6 +584,14 @@ try
             end
         end
         show3D(scenario, FastUpdate = true, Parent = ax3);
+        if opts.followCamera
+            % Chase camera: above wall height (walls are ~2.4 m and would
+            % otherwise hide the robot), behind it, smoothed heading.
+            camYaw = camYaw + 0.15 * atan2(sin(th(k) - camYaw), cos(th(k) - camYaw));
+            camtarget(ax3, [x(k) y(k) 0.3]);
+            campos(ax3, [x(k) - 2.2*cos(camYaw), y(k) - 2.2*sin(camYaw), 5.5]);
+            camva(ax3, 40);
+        end
         set(executedTrace,'XData',x(1:k),'YData',y(1:k),'ZData',.03*ones(k,1));
         if ~isnan(minClear)
             if collided, cstr = 'COLLISION'; else cstr = 'clear'; end
@@ -561,6 +613,7 @@ try
     end
     if ~isempty(vw3), close(vw3); end
 catch ME
+    if opts.sceneOnly, rethrow(ME); end
     notes{end+1} = sprintf( ...
         '3D scene animation failed (%s): %s. 2D top-down and robot stills remain.', ...
         ME.identifier, ME.message);

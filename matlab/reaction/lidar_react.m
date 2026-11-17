@@ -74,6 +74,13 @@ end
 goal = path(end,:);
 fpBody = o.footprint;
 growFp = fpBody + 0.03*fpBody./max(vecnorm(fpBody,2,2),1e-9);
+liveAxes=[];
+if isfield(o,'liveAxes') && isgraphics(o.liveAxes,'axes')
+    liveAxes=o.liveAxes;
+    livePath=plot3(liveAxes,curPath(:,1),curPath(:,2),0.04*ones(size(curPath,1),1),'k--','LineWidth',1.4,'Tag','LivePlan');
+    liveTrace=plot3(liveAxes,pose(1),pose(2),0.05,'b-','LineWidth',1.5,'Tag','LiveTrace');
+    liveHits=plot3(liveAxes,nan,nan,nan,'r.','MarkerSize',9,'Tag','LiveDetectedCells');
+end
 
 while tNow < o.maxTime
     % --- simulated lidar (own ray caster against true geometry) -----------
@@ -204,6 +211,19 @@ while tNow < o.maxTime
             stopReason = 'platform_error';
             notes{end+1} = ['PLATFORM MOVE FAILED (success withheld): ' ME.message]; %#ok<AGROW>
             break
+        end
+    end
+    if ~isempty(liveAxes) && isgraphics(liveAxes) && mod(size(logT,1)-2,5)==0
+        try
+            show3D(scen,FastUpdate=true,Parent=liveAxes);
+            set(livePath,'XData',curPath(:,1),'YData',curPath(:,2),'ZData',0.04*ones(size(curPath,1),1));
+            set(liveTrace,'XData',logT(:,2),'YData',logT(:,3),'ZData',0.05*ones(size(logT,1),1));
+            set(liveHits,'XData',UC(:,1),'YData',UC(:,2),'ZData',0.08*ones(size(UC,1),1));
+            title(liveAxes,sprintf('t=%.1f s | sensor scans=%d | detected cells=%d | replans=%d',tNow,rsUpdates,size(UC,1),replans));
+            drawnow limitrate;
+        catch ME
+            warning('lidar_react:liveView','Live view stopped: %s',ME.message);
+            liveAxes=[];
         end
     end
     if norm(pose(1:2)-lastPose(1:2)) > 0.02, lastPose = pose; stuckT = tNow; end
